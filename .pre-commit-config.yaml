@@ -30,10 +30,9 @@ repos:
     hooks:
       - id: mypy
         name: Check type hints with mypy
-        entry: uv run mypy
+        entry: bash -c 'uv run mypy spark/ scripts/'
         language: system
         types: [python]
-        args: [--config-file=pyproject.toml]
         files: ^(spark|scripts)/.*\.py$
         pass_filenames: false
 
