@@ -1,0 +1,63 @@
+# Pre-commit hooks configuration
+# Install: make pre-commit-install
+# Run manually: make pre-commit-run
+
+repos:
+  # Black - Code formatter (using local/system version)
+  - repo: local
+    hooks:
+      - id: black
+        name: Format code with black
+        entry: uv run black
+        language: system
+        types: [python]
+        args: [--line-length=100]
+        files: ^(spark|scripts)/.*\.py$
+
+  # Ruff - Fast Python linter (using local/system version)
+  - repo: local
+    hooks:
+      - id: ruff
+        name: Lint code with ruff
+        entry: uv run ruff check
+        language: system
+        types: [python]
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(spark|scripts)/.*\.py$
+
+  # Mypy - Static type checker (using local/system version)
+  - repo: local
+    hooks:
+      - id: mypy
+        name: Check type hints with mypy
+        entry: uv run mypy
+        language: system
+        types: [python]
+        args: [--config-file=pyproject.toml]
+        files: ^(spark|scripts)/.*\.py$
+        pass_filenames: false
+
+  # Built-in pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: debug-statements
+        name: Check for debug statements
+      - id: mixed-line-ending
+        name: Check for mixed line endings
+        args: [--fix=lf]
