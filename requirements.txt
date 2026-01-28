@@ -1,0 +1,33 @@
+# NOTE: This project uses pyproject.toml as the primary dependency specification.
+# Use 'uv sync' to install dependencies from pyproject.toml (recommended)
+# This requirements.txt file is kept for reference and compatibility.
+#
+# To install dependencies:
+#   uv sync              # Install from pyproject.toml (recommended)
+#   make install         # Install production dependencies only
+#   make install-dev     # Install with dev dependencies
+
+# Core Data Engineering
+pyspark>=3.5.0
+delta-spark>=3.0.0
+
+# Airflow
+apache-airflow>=2.8.0
+
+# Data Generation & Processing
+faker>=22.0.0
+pandas>=2.1.4
+numpy>=1.26.3
+
+# Jupyter & Analysis
+jupyter>=1.0.0
+matplotlib>=3.8.2
+seaborn>=0.13.1
+
+# Testing
+pytest>=7.4.4
+pytest-cov>=4.1.0
+
+# Code Quality
+ruff>=0.1.11
+black>=23.12.1
