@@ -218,8 +218,10 @@ def run_gold_aggregation(
 
 
 if __name__ == "__main__":
+    from delta import configure_spark_with_delta_pip
+
     # Create Spark session with Delta Lake support
-    spark = (
+    builder = (
         SparkSession.builder.appName("Gold Layer Aggregation")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
@@ -227,8 +229,8 @@ if __name__ == "__main__":
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
         .config("spark.sql.warehouse.dir", "spark-warehouse")
-        .getOrCreate()
     )
+    spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
     # Set log level to reduce noise
     spark.sparkContext.setLogLevel("WARN")

@@ -13,6 +13,7 @@ documentation/*
 # C extensions
 *.so
 
+data/
 
 # Distribution / packaging
 .Python

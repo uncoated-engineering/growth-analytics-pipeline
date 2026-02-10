@@ -39,8 +39,8 @@ def ingest_feature_releases(spark, input_path, output_path):
         ]
     )
 
-    # Read JSON file
-    df = spark.read.schema(schema).json(input_path)
+    # Read JSON file (multiLine=True for standard JSON array format)
+    df = spark.read.schema(schema).option("multiLine", True).json(input_path)
 
     # Rename 'id' to 'feature_id' and 'name' to 'feature_name' for clarity
     df = df.withColumnRenamed("id", "feature_id").withColumnRenamed("name", "feature_name")
@@ -249,16 +249,18 @@ def run_bronze_ingestion(spark, raw_data_path="data/raw", bronze_path="data/bron
 
 
 if __name__ == "__main__":
+    from delta import configure_spark_with_delta_pip
+
     # Create Spark session with Delta Lake support
-    spark = (
+    builder = (
         SparkSession.builder.appName("Bronze Layer Ingestion")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
             "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
         )
         .config("spark.sql.warehouse.dir", "spark-warehouse")
-        .getOrCreate()
     )
+    spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
     # Set log level to reduce noise
     spark.sparkContext.setLogLevel("WARN")
