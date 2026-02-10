@@ -10,8 +10,8 @@ authors = [
 
 dependencies = [
     # Core Data Engineering
-    "pyspark>=3.5.0",
-    "delta-spark>=3.0.0",
+    "pyspark>=3.5.0,<4.0.0",  # Pin to 3.5.x for compatibility with delta-spark
+    "delta-spark>=3.2.0,<4.0.0",  # Pin to 3.2.x for compatibility with PySpark 3.5.x
 
     # Airflow
     "apache-airflow>=2.8.0",

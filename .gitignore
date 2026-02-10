@@ -7,6 +7,8 @@ __pycache__/
 agent_instructions/*
 CLAUDE.md
 documentation/*
+.vscode/
+.claude/
 
 # C extensions
 *.so
