@@ -15,6 +15,7 @@ dependencies = [
 
     # Airflow
     "apache-airflow>=2.8.0",
+    "apache-airflow-providers-apache-spark>=4.7.0",
 
     # Data Generation & Processing
     "faker>=22.0.0",

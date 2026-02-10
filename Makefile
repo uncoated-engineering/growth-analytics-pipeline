@@ -1,4 +1,4 @@
-.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test docker-up docker-down generate-data airflow-init notebook validate-bronze ingest-bronze ingest-silver ingest-gold pipeline
+.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test test-airflow docker-up docker-down generate-data airflow-init notebook validate-bronze ingest-bronze ingest-silver ingest-gold pipeline
 
 help:
 	@echo "Available commands:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make pre-commit-run       - Run pre-commit hooks on all files"
 	@echo "  make pre-commit-update    - Update pre-commit hooks to latest versions"
 	@echo "  make test                 - Run tests"
+	@echo "  make test-airflow         - Run Airflow DAG tests"
 	@echo "  make docker-up            - Start Docker services"
 	@echo "  make docker-down          - Stop Docker services"
 	@echo "  make generate-data        - Generate synthetic data"
@@ -57,19 +58,19 @@ clean:
 
 format:
 	@echo "Formatting code with black..."
-	uv run black spark/ scripts/
+	uv run black spark/ scripts/ airflow/
 	@echo "Formatting code with ruff..."
-	uv run ruff check --fix spark/ scripts/
+	uv run ruff check --fix spark/ scripts/ airflow/
 	@echo "Formatting complete!"
 
 lint:
 	@echo "Linting code with ruff..."
-	uv run ruff check spark/ scripts/
+	uv run ruff check spark/ scripts/ airflow/
 	@echo "Linting complete!"
 
 assert-typing:
 	@echo "Checking type hints with mypy..."
-	uv run mypy spark/ scripts/
+	uv run mypy spark/ scripts/ airflow/
 	@echo "Type checking complete!"
 
 pre-commit-install:
@@ -89,6 +90,10 @@ pre-commit-update:
 test:
 	@echo "Running tests..."
 	uv run pytest spark/tests/ -v
+
+test-airflow:
+	@echo "Running Airflow DAG tests..."
+	uv run pytest airflow/tests/ -v
 
 docker-up:
 	@echo "Starting Docker services..."

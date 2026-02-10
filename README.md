@@ -25,6 +25,12 @@ growth-analytics-pipeline/
 │   │   ├── silver_scd_transform.py  # Silver layer: SCD Type 2
 │   │   └── gold_cohort_analysis.py  # Gold layer: cohort analytics
 │   └── tests/                  # Unit tests
+├── airflow/
+│   ├── dags/                   # Airflow DAG definitions
+│   │   └── saas_plg_pipeline.py     # Main pipeline DAG
+│   ├── plugins/                # Custom Airflow operators
+│   └── tests/                  # DAG tests
+│       └── test_dag.py
 ├── scripts/
 │   └── generate_synthetic_data.py   # Generate test data
 ├── notebooks/                  # Jupyter notebooks for analysis
@@ -196,12 +202,71 @@ make pipeline
 
 This executes all three layers sequentially: bronze → silver → gold.
 
+## Orchestration with Airflow
+
+The pipeline is orchestrated by an Airflow DAG (`airflow/dags/saas_plg_pipeline.py`) that manages task dependencies and scheduling.
+
+### DAG: `saas_plg_analytics_pipeline`
+
+- **Schedule**: `@daily`
+- **Owner**: `data-engineering`
+- **Retries**: 1 (5-minute delay)
+- **Catchup**: Disabled
+
+### Task Dependency Graph
+
+```
+ingest_feature_releases ─┐
+ingest_user_signups ─────┤
+ingest_feature_usage ────┼──→ maintain_feature_states_scd ──→ build_feature_usage_facts ──→ calculate_feature_conversion_impact
+ingest_conversions ──────┘
+```
+
+- **Bronze tasks** run in parallel (no inter-dependencies)
+- **Silver tasks** run sequentially (SCD must complete before usage facts)
+- **Gold task** runs after all silver tasks complete
+
+### Tasks
+
+| Task ID | Layer | Spark Job |
+|---------|-------|-----------|
+| `ingest_feature_releases` | Bronze | `bronze_ingestion.py` |
+| `ingest_user_signups` | Bronze | `bronze_ingestion.py` |
+| `ingest_feature_usage` | Bronze | `bronze_ingestion.py` |
+| `ingest_conversions` | Bronze | `bronze_ingestion.py` |
+| `maintain_feature_states_scd` | Silver | `silver_scd_transform.py` |
+| `build_feature_usage_facts` | Silver | `silver_scd_transform.py` |
+| `calculate_feature_conversion_impact` | Gold | `gold_cohort_analysis.py` |
+
+### Running Airflow
+
+```bash
+# Initialize Airflow database
+make airflow-init
+
+# Start Airflow services via Docker
+make docker-up
+
+# Run DAG tests
+make test-airflow
+```
+
+### Validation
+
+1. Trigger DAG manually in Airflow UI
+2. Verify all tasks turn green
+3. Check task logs for errors
+
 ## Development
 
 ### Run Tests
 
 ```bash
+# Run Spark job tests
 make test
+
+# Run Airflow DAG tests
+make test-airflow
 ```
 
 ### Code Quality
@@ -293,11 +358,11 @@ spark.read.format('delta').load('data/bronze/feature_releases').count()
 
 ```
 Raw Data (JSON/JSONL)
-    ↓
-[Bronze Layer] - Raw ingestion with timestamps
-    ↓
-[Silver Layer] - Cleaned, deduplicated, SCD Type 2
-    ↓
+    ↓                        ┌──────────────────────────┐
+[Bronze Layer] ─ parallel ─→ │   Airflow DAG (@daily)   │
+    ↓                        │   Orchestrates all tasks  │
+[Silver Layer] ─ sequential  │   with SparkSubmitOperator│
+    ↓                        └──────────────────────────┘
 [Gold Layer] - Business metrics & cohort analysis
     ↓
 Analytics & Reporting
@@ -330,7 +395,8 @@ make ingest-bronze        # Run bronze layer ingestion
 make ingest-silver        # Run silver layer transformation
 make ingest-gold          # Run gold layer aggregation
 make pipeline             # Run full pipeline (bronze → silver → gold)
-make test                 # Run unit tests
+make test                 # Run Spark job unit tests
+make test-airflow         # Run Airflow DAG tests
 make clean                # Remove cache and temp files
 make notebook             # Start Jupyter notebook server
 ```
