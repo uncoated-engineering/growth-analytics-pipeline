@@ -119,17 +119,74 @@ make ingest-bronze
 - Idempotent writes in append mode
 - Automatic `ingestion_timestamp` for data lineage
 
-### Silver Layer - Data Transformation (Coming Soon)
+### Silver Layer - SCD Type 2 Transformation
+
+The silver layer transforms bronze data into analytical-ready tables using Slowly Changing Dimensions (SCD) Type 2 for historical tracking.
+
+**Run silver transformation:**
 
 ```bash
 make ingest-silver
 ```
 
-### Gold Layer - Business Analytics (Coming Soon)
+**What it does:**
+
+1. **Feature States (SCD Type 2)**: Tracks feature version history with change detection
+   - Schema: `feature_id, feature_name, version, is_enabled, effective_from, effective_to, is_current, record_hash`
+   - Uses Delta MERGE with staged updates pattern for atomic upserts
+   - `record_hash` (MD5 of feature_name + version) detects changes
+   - `effective_to = 9999-12-31` marks current records; old versions get closed with the new version's effective date
+   - Output: `data/silver/silver_feature_states/`
+
+2. **User Dimension**: Simplified user dimension enriched with conversion data
+   - Schema: `user_id, signup_date, company_size, industry, current_plan`
+   - Joins signups with latest conversion; defaults to `'free'` for non-converted users
+   - Output: `data/silver/silver_user_dim/`
+
+3. **Feature Usage Facts**: Aggregated per-user, per-feature usage summaries
+   - Schema: `user_id, feature_id, first_used_date, last_used_date, total_usage_count, avg_daily_usage, as_of_date`
+   - Enables "used before conversion" analysis via `first_used_date`
+   - `as_of_date` supports time-point snapshot queries
+   - Output: `data/silver/silver_feature_usage_facts/`
+
+**Features:**
+- SCD Type 2 with Delta MERGE for atomic close-and-insert operations
+- Idempotent: re-running with unchanged data produces no duplicates
+- Time-travel queries: filter by `effective_from`/`effective_to` for point-in-time state
+- Change detection via MD5 record hashing
+
+### Gold Layer - Cohort Analysis
+
+The gold layer builds business-level analytics from silver and bronze data, answering the key question: **"Does feature adoption drive conversion?"**
+
+**Run gold aggregation:**
 
 ```bash
 make ingest-gold
 ```
+
+**What it does:**
+
+1. **Feature Conversion Impact**: Cohort analysis correlating feature usage with conversion rates
+   - Schema: `feature_name, cohort, total_users, converted_users, conversion_rate, avg_days_to_convert, avg_mrr`
+   - Cohorts: `used_before_conversion`, `available_not_used`, `not_available`
+   - Overwrite mode with schema evolution
+   - Output: `data/gold/gold_feature_conversion_impact/`
+
+**Key Insight:**
+Compare conversion rates across cohorts to measure feature impact:
+```
+cohort                  | conversion_rate
+-----------------------------------------
+used_before_conversion  | 22% (feature adopters)
+available_not_used      | 18% (non-adopters)
+→ 22% / 18% = 1.22x = ~23% conversion lift
+```
+
+**Features:**
+- Cross-joins users with all current features for complete cohort coverage
+- Correctly handles non-converted users (counted in totals, excluded from averages)
+- Delta Lake overwrite mode ensures idempotent re-runs
 
 ### Run Full Pipeline
 
