@@ -1,15 +1,3 @@
-"""
-Gold Layer - Cohort Analysis
-
-This module builds business-level analytics from silver and bronze layer tables:
-- gold_feature_conversion_impact: Feature correlation with conversion rates
-
-This is THE analysis that shows "23% conversion lift" for feature adoption.
-
-Uses silver_user_dim, silver_feature_states, silver_feature_usage_facts,
-and bronze_conversions to calculate per-feature cohort conversion metrics.
-"""
-
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     avg,
@@ -19,11 +7,11 @@ from pyspark.sql.functions import (
     current_date,
     datediff,
     lit,
+    row_number,
     when,
 )
-from pyspark.sql.functions import (
-    sum as spark_sum,
-)
+from pyspark.sql.functions import sum as spark_sum
+from pyspark.sql.window import Window
 
 
 def calculate_feature_conversion_impact(
@@ -66,9 +54,6 @@ def calculate_feature_conversion_impact(
     conversions = spark.read.format("delta").load(f"{bronze_path}/conversions")
 
     # Get latest conversion per user (in case of duplicates)
-    from pyspark.sql.functions import row_number
-    from pyspark.sql.window import Window
-
     conv_window = Window.partitionBy("user_id").orderBy(col("conversion_date").desc())
     latest_conversions = (
         conversions.withColumn("rn", row_number().over(conv_window))
@@ -86,17 +71,17 @@ def calculate_feature_conversion_impact(
     )
 
     # Step 1: Build user_feature_context
-    # Users LEFT JOIN conversions → gives us conversion_date and mrr per user
+    # Users LEFT JOIN conversions -> gives us conversion_date and mrr per user
     users_with_conv = users.join(
         latest_conversions,
         col("user_id") == col("conv_user_id"),
         "left",
     ).drop("conv_user_id")
 
-    # CROSS JOIN with current features → one row per user per feature
+    # CROSS JOIN with current features -> one row per user per feature
     user_feature = users_with_conv.crossJoin(current_features)
 
-    # LEFT JOIN with usage facts → did this user use this feature?
+    # LEFT JOIN with usage facts -> did this user use this feature?
     user_feature_context = user_feature.join(
         usage_facts.select(
             col("user_id").alias("ufu_user_id"),
@@ -176,88 +161,3 @@ def calculate_feature_conversion_impact(
     row_count = result_df.count()
     print(f"  Feature conversion impact complete: {row_count} cohort rows")
     return row_count
-
-
-def run_gold_aggregation(
-    spark: SparkSession,
-    bronze_path: str = "data/bronze",
-    silver_path: str = "data/silver",
-    gold_path: str = "data/gold",
-) -> dict:
-    """
-    Run all gold layer aggregation jobs.
-
-    Args:
-        spark: SparkSession
-        bronze_path: Base path for bronze Delta tables
-        silver_path: Base path for silver Delta tables
-        gold_path: Base path for gold Delta tables
-
-    Returns:
-        Dictionary with row counts per gold table
-    """
-    print("=" * 80)
-    print("Starting Gold Layer Aggregation")
-    print("=" * 80)
-
-    aggregation_stats = {}
-
-    # Feature conversion impact analysis
-    aggregation_stats["feature_conversion_impact"] = calculate_feature_conversion_impact(
-        spark, bronze_path, silver_path, gold_path
-    )
-
-    print("=" * 80)
-    print("Gold Layer Aggregation Complete")
-    print("=" * 80)
-    print("\nAggregation Summary:")
-    for table, row_count in aggregation_stats.items():
-        print(f"  {table}: {row_count} rows")
-
-    return aggregation_stats
-
-
-if __name__ == "__main__":
-    from delta import configure_spark_with_delta_pip
-
-    # Create Spark session with Delta Lake support
-    builder = (
-        SparkSession.builder.appName("Gold Layer Aggregation")
-        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-        .config(
-            "spark.sql.catalog.spark_catalog",
-            "org.apache.spark.sql.delta.catalog.DeltaCatalog",
-        )
-        .config("spark.sql.warehouse.dir", "spark-warehouse")
-    )
-    spark = configure_spark_with_delta_pip(builder).getOrCreate()
-
-    # Set log level to reduce noise
-    spark.sparkContext.setLogLevel("WARN")
-
-    try:
-        stats = run_gold_aggregation(spark)
-
-        # Validation: Query gold table to verify the "story"
-        print("\n" + "=" * 80)
-        print("Validation: Verifying Gold Tables")
-        print("=" * 80)
-
-        gold_path = "data/gold/gold_feature_conversion_impact"
-        df = spark.read.format("delta").load(gold_path)
-        row_count = df.count()
-        print("\ngold_feature_conversion_impact:")
-        print(f"  Row count: {row_count}")
-        print("  Schema:")
-        df.printSchema()
-        print("  All cohort data:")
-        df.show(truncate=False)
-
-        # Show the key insight: real_time_collab conversion lift
-        print("\n" + "=" * 80)
-        print("Key Insight: Feature Conversion Impact")
-        print("=" * 80)
-        df.filter(col("feature_name") == "real_time_collab").show(truncate=False)
-
-    finally:
-        spark.stop()

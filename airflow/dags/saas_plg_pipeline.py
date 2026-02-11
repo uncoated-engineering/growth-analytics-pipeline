@@ -34,26 +34,26 @@ dag = DAG(
 # ---------------------------------------------------------------------------
 ingest_features = SparkSubmitOperator(
     task_id="ingest_feature_releases",
-    application="/opt/spark/jobs/bronze_ingestion.py",
+    application="/opt/spark/jobs/bronze/main.py",
     conf={"spark.executor.memory": "2g"},
     dag=dag,
 )
 
 ingest_users = SparkSubmitOperator(
     task_id="ingest_user_signups",
-    application="/opt/spark/jobs/bronze_ingestion.py",
+    application="/opt/spark/jobs/bronze/main.py",
     dag=dag,
 )
 
 ingest_usage = SparkSubmitOperator(
     task_id="ingest_feature_usage",
-    application="/opt/spark/jobs/bronze_ingestion.py",
+    application="/opt/spark/jobs/bronze/main.py",
     dag=dag,
 )
 
 ingest_conversions = SparkSubmitOperator(
     task_id="ingest_conversions",
-    application="/opt/spark/jobs/bronze_ingestion.py",
+    application="/opt/spark/jobs/bronze/main.py",
     dag=dag,
 )
 
@@ -62,13 +62,13 @@ ingest_conversions = SparkSubmitOperator(
 # ---------------------------------------------------------------------------
 maintain_scd = SparkSubmitOperator(
     task_id="maintain_feature_states_scd",
-    application="/opt/spark/jobs/silver_scd_transform.py",
+    application="/opt/spark/jobs/silver/main.py",
     dag=dag,
 )
 
 build_usage_facts = SparkSubmitOperator(
     task_id="build_feature_usage_facts",
-    application="/opt/spark/jobs/silver_scd_transform.py",
+    application="/opt/spark/jobs/silver/main.py",
     dag=dag,
 )
 
@@ -77,7 +77,7 @@ build_usage_facts = SparkSubmitOperator(
 # ---------------------------------------------------------------------------
 analyze_feature_impact = SparkSubmitOperator(
     task_id="calculate_feature_conversion_impact",
-    application="/opt/spark/jobs/gold_cohort_analysis.py",
+    application="/opt/spark/jobs/gold/main.py",
     dag=dag,
 )
 

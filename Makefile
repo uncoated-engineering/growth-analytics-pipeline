@@ -121,15 +121,15 @@ validate-bronze:
 
 ingest-bronze:
 	@echo "Running bronze layer ingestion..."
-	uv run python spark/jobs/bronze_ingestion.py
+	uv run python -m spark.jobs.bronze.main
 
 ingest-silver:
 	@echo "Running silver layer transformation..."
-	uv run python spark/jobs/silver_scd_transform.py
+	uv run python -m spark.jobs.silver.main
 
 ingest-gold:
 	@echo "Running gold layer aggregation..."
-	uv run python spark/jobs/gold_cohort_analysis.py
+	uv run python -m spark.jobs.gold.main
 
 pipeline:
 	@echo "Running full data pipeline..."

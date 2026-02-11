@@ -14,18 +14,14 @@ from datetime import date
 
 from pyspark.sql.functions import col
 
-from spark.jobs.bronze_ingestion import (
-    ingest_conversions,
-    ingest_feature_releases,
-    ingest_feature_usage_events,
-    ingest_user_signups,
-)
-from spark.jobs.silver_scd_transform import (
-    create_feature_usage_facts,
-    maintain_feature_states_scd,
-    maintain_user_dim,
-    run_silver_transformation,
-)
+from spark.jobs.bronze.conversions.extract import ingest_conversions
+from spark.jobs.bronze.feature_releases.extract import ingest_feature_releases
+from spark.jobs.bronze.feature_usage_events.extract import ingest_feature_usage_events
+from spark.jobs.bronze.user_signups.extract import ingest_user_signups
+from spark.jobs.silver.feature_states.transformation import maintain_feature_states_scd
+from spark.jobs.silver.feature_usage_facts.transformation import create_feature_usage_facts
+from spark.jobs.silver.main import run_silver_transformation
+from spark.jobs.silver.user_dim.transformation import maintain_user_dim
 
 
 def _setup_bronze_feature_releases(spark, temp_dir, releases):
