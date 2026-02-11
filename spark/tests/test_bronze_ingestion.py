@@ -13,13 +13,11 @@ import json
 import os
 from datetime import datetime
 
-from spark.jobs.bronze_ingestion import (
-    ingest_conversions,
-    ingest_feature_releases,
-    ingest_feature_usage_events,
-    ingest_user_signups,
-    run_bronze_ingestion,
-)
+from spark.jobs.bronze.conversions.extract import ingest_conversions
+from spark.jobs.bronze.feature_releases.extract import ingest_feature_releases
+from spark.jobs.bronze.feature_usage_events.extract import ingest_feature_usage_events
+from spark.jobs.bronze.main import run_bronze_ingestion
+from spark.jobs.bronze.user_signups.extract import ingest_user_signups
 
 
 class TestIngestFeatureReleases:
