@@ -197,7 +197,7 @@ make ingest-gold
 
 1. **Feature Conversion Impact**: Cohort analysis correlating feature usage with conversion rates
    - Schema: `feature_name, cohort, total_users, converted_users, conversion_rate, avg_days_to_convert, avg_mrr`
-   - Cohorts: `used_before_conversion`, `available_not_used`, `not_available`
+   - Cohorts: `used_feature`, `available_not_used`, `not_available`
    - Overwrite mode with schema evolution
    - Output: `data/gold/gold_feature_conversion_impact/`
 
@@ -206,9 +206,9 @@ Compare conversion rates across cohorts to measure feature impact:
 ```
 cohort                  | conversion_rate
 -----------------------------------------
-used_before_conversion  | 22% (feature adopters)
-available_not_used      | 18% (non-adopters)
-→ 22% / 18% = 1.22x = ~23% conversion lift
+used_feature            | 37% (feature adopters)
+available_not_used      |  8% (non-adopters)
+→ 37% / 8% = 4.6x conversion lift
 ```
 
 **Features:**

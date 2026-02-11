@@ -1,7 +1,7 @@
 """
 Gold feature conversion impact output columns:
     feature_name (STRING)
-    cohort (STRING)             - 'used_before_conversion', 'available_not_used',
+    cohort (STRING)             - 'used_feature', 'available_not_used',
                                   or 'not_available'
     total_users (LONG)
     converted_users (LONG)

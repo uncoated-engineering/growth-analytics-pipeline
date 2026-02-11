@@ -107,7 +107,7 @@ class TestCalculateFeatureConversionImpact:
             {"id": 1, "name": "real_time_collab", "release_date": "2024-01-01", "version": "v1.0"},
         ]
         signups = [
-            # User 1: will use feature and convert → used_before_conversion
+            # User 1: will use feature and convert → used_feature
             {
                 "user_id": 1,
                 "email": "u1@test.com",
@@ -165,10 +165,9 @@ class TestCalculateFeatureConversionImpact:
 
         df = spark.read.format("delta").load(f"{gold_path}/gold_feature_conversion_impact")
 
-        # User 1 should be in 'used_before_conversion' cohort
+        # User 1 should be in 'used_feature' cohort
         used_cohort = df.filter(
-            (col("feature_name") == "real_time_collab")
-            & (col("cohort") == "used_before_conversion")
+            (col("feature_name") == "real_time_collab") & (col("cohort") == "used_feature")
         ).collect()
         assert len(used_cohort) == 1
         assert used_cohort[0].total_users >= 1
@@ -504,10 +503,9 @@ class TestCalculateFeatureConversionImpact:
 
         df = spark.read.format("delta").load(f"{gold_path}/gold_feature_conversion_impact")
 
-        # real_time_collab: user 1 should be used_before_conversion
+        # real_time_collab: user 1 should be used_feature
         rtc_used = df.filter(
-            (col("feature_name") == "real_time_collab")
-            & (col("cohort") == "used_before_conversion")
+            (col("feature_name") == "real_time_collab") & (col("cohort") == "used_feature")
         ).collect()
         assert len(rtc_used) == 1
 
@@ -517,7 +515,7 @@ class TestCalculateFeatureConversionImpact:
         ).collect()
         assert len(ai_available) == 1
 
-    def test_used_before_conversion_has_higher_signal(self, spark, temp_dir):
+    def test_used_feature_has_higher_signal(self, spark, temp_dir):
         """
         Test the core insight: users who use a feature before converting
         should show as a distinct cohort that can be compared.
@@ -643,15 +641,14 @@ class TestCalculateFeatureConversionImpact:
         df = spark.read.format("delta").load(f"{gold_path}/gold_feature_conversion_impact")
 
         used_cohort = df.filter(
-            (col("feature_name") == "real_time_collab")
-            & (col("cohort") == "used_before_conversion")
+            (col("feature_name") == "real_time_collab") & (col("cohort") == "used_feature")
         ).collect()[0]
 
         available_cohort = df.filter(
             (col("feature_name") == "real_time_collab") & (col("cohort") == "available_not_used")
         ).collect()[0]
 
-        # used_before_conversion: 3 users, all convert → 100% conversion
+        # used_feature: 3 users, all convert → 100% conversion
         assert used_cohort.total_users == 3
         assert used_cohort.converted_users == 3
         assert abs(used_cohort.conversion_rate - 1.0) < 0.001

@@ -1,10 +1,8 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     avg,
-    coalesce,
     col,
     count,
-    current_date,
     datediff,
     lit,
     row_number,
@@ -21,12 +19,18 @@ def calculate_feature_conversion_impact(
     Calculate feature impact on conversion rates using cohort analysis.
 
     Joins users with features and their usage to determine whether using
-    a feature before conversion correlates with higher conversion rates.
+    a feature correlates with higher conversion rates.
+
+    Cohort definitions (independent of conversion status):
+        - used_feature:        user has at least one usage event for this feature
+        - available_not_used:  feature was released on or before the user's signup,
+                               but the user never used it
+        - not_available:       feature was released after the user signed up,
+                               and the user never used it
 
     Output schema:
         feature_name (STRING)
-        cohort (STRING)             - 'used_before_conversion', 'available_not_used',
-                                      or 'not_available'
+        cohort (STRING)
         total_users (LONG)
         converted_users (LONG)
         conversion_rate (DOUBLE)
@@ -70,7 +74,7 @@ def calculate_feature_conversion_impact(
         "feature_id", "feature_name", "effective_from", "effective_to"
     )
 
-    # Step 1: Build user_feature_context
+    # Step 1: Build user-feature context
     # Users LEFT JOIN conversions -> gives us conversion_date and mrr per user
     users_with_conv = users.join(
         latest_conversions,
@@ -92,29 +96,16 @@ def calculate_feature_conversion_impact(
         "left",
     ).drop("ufu_user_id", "ufu_feature_id")
 
-    # Compute feature_available flag:
-    # Was the feature available during the user's trial period?
-    reference_date = coalesce(col("conversion_date"), current_date())
-    user_feature_context = user_feature_context.withColumn(
-        "feature_available",
-        (col("effective_from") <= reference_date) & (col("effective_to") > reference_date),
-    )
-
-    # Compute used_before_conversion flag:
-    # Did the user try the feature before converting?
-    user_feature_context = user_feature_context.withColumn(
-        "used_before_conversion",
-        col("first_used_date").isNotNull()
-        & col("conversion_date").isNotNull()
-        & (col("first_used_date") < col("conversion_date")),
-    )
-
-    # Step 2: Assign cohorts
+    # Step 2: Assign cohorts based on usage and availability at signup
+    # (independent of conversion status so all cohorts have a meaningful rate)
     user_feature_context = user_feature_context.withColumn(
         "cohort",
-        when(col("used_before_conversion"), lit("used_before_conversion"))
+        when(
+            col("first_used_date").isNotNull(),
+            lit("used_feature"),
+        )
         .when(
-            col("feature_available") & ~col("used_before_conversion"),
+            col("effective_from") <= col("signup_date"),
             lit("available_not_used"),
         )
         .otherwise(lit("not_available")),
@@ -139,7 +130,7 @@ def calculate_feature_conversion_impact(
             ).alias("avg_days_to_convert"),
             avg(when(col("conversion_date").isNotNull(), col("mrr"))).alias("avg_mrr"),
         )
-        .orderBy(col("conversion_rate").desc())
+        .orderBy("feature_name", col("conversion_rate").desc())
     )
 
     # Select final column order

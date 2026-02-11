@@ -1,7 +1,8 @@
 from delta.tables import DeltaTable
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col, concat_ws, lit, md5, to_date
+from pyspark.sql.functions import col, concat_ws, lead, lit, md5, to_date, when
 from pyspark.sql.types import DateType
+from pyspark.sql.window import Window
 
 from spark.jobs.silver.feature_states.schema import END_OF_TIME
 
@@ -61,7 +62,19 @@ def maintain_feature_states_scd(spark: SparkSession, bronze_path: str, silver_pa
         table_exists = False
 
     if not table_exists:
-        # First run: write all incoming as new SCD records
+        # First run: handle multiple versions per feature in a single batch
+        # Close older versions by setting effective_to to the next version's effective_from
+        version_window = Window.partitionBy("feature_id").orderBy(col("effective_from"))
+        incoming = incoming.withColumn("_next_from", lead("effective_from").over(version_window))
+        incoming = incoming.withColumn(
+            "effective_to",
+            when(col("_next_from").isNotNull(), col("_next_from")).otherwise(
+                lit(END_OF_TIME).cast(DateType())
+            ),
+        )
+        incoming = incoming.withColumn("is_current", col("_next_from").isNull())
+        incoming = incoming.drop("_next_from")
+
         incoming.write.format("delta").mode("overwrite").save(output_path)
         result_df = spark.read.format("delta").load(output_path)
         row_count = result_df.count()
