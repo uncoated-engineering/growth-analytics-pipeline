@@ -54,7 +54,8 @@ growth-analytics-pipeline/
 │       └── test_dag.py
 ├── scripts/
 │   └── generate_synthetic_data.py   # Generate test data
-├── notebooks/                  # Jupyter notebooks for analysis
+├── notebooks/
+│   └── analysis_demo.ipynb    # PLG analysis demo & visualizations
 ├── docker/                     # Docker compose for services
 ├── agent_instructions/         # Implementation guidelines
 ├── pyproject.toml             # Project dependencies (UV/pip)
@@ -351,6 +352,12 @@ The hooks will automatically:
 ```bash
 make notebook
 ```
+
+Opens `notebooks/analysis_demo.ipynb` which demonstrates:
+- Loading gold-layer cohort metrics
+- Bar chart: conversion rates by feature and usage cohort
+- Key insight: real-time collaboration conversion lift
+- SCD Type 2 time-travel: querying historical vs current feature states
 
 ## Delta Lake Tables
 
