@@ -20,14 +20,35 @@ growth-analytics-pipeline/
 │   ├── silver/                 # Silver Delta tables (cleaned & transformed)
 │   └── gold/                   # Gold Delta tables (aggregated analytics)
 ├── spark/
-│   ├── jobs/                   # Spark job implementations
-│   │   ├── bronze_ingestion.py      # Bronze layer: raw to Delta
-│   │   ├── silver_scd_transform.py  # Silver layer: SCD Type 2
-│   │   └── gold_cohort_analysis.py  # Gold layer: cohort analytics
+│   ├── jobs/
+│   │   ├── data_quality/            # Shared validation framework
+│   │   │   └── validators.py
+│   │   ├── bronze/
+│   │   │   ├── feature_releases/    # schema, extract, validate, main
+│   │   │   ├── user_signups/
+│   │   │   ├── feature_usage_events/
+│   │   │   ├── conversions/
+│   │   │   └── main.py              # Layer-level orchestrator (make pipeline)
+│   │   ├── silver/
+│   │   │   ├── feature_states/      # schema, transformation, validate, main
+│   │   │   ├── user_dim/
+│   │   │   ├── feature_usage_facts/
+│   │   │   └── main.py
+│   │   └── gold/
+│   │       ├── feature_conversion_impact/  # schema, aggregation, validate, main
+│   │       └── main.py
 │   └── tests/                  # Unit tests
 ├── airflow/
-│   ├── dags/                   # Airflow DAG definitions
-│   │   └── saas_plg_pipeline.py     # Main pipeline DAG
+│   ├── dags/                   # Per-table DAG definitions
+│   │   ├── config.py                # Shared config, Dataset definitions
+│   │   ├── bronze_feature_releases.py
+│   │   ├── bronze_user_signups.py
+│   │   ├── bronze_feature_usage_events.py
+│   │   ├── bronze_conversions.py
+│   │   ├── silver_feature_states.py
+│   │   ├── silver_user_dim.py
+│   │   ├── silver_feature_usage_facts.py
+│   │   └── gold_feature_conversion_impact.py
 │   ├── plugins/                # Custom Airflow operators
 │   └── tests/                  # DAG tests
 │       └── test_dag.py
@@ -204,39 +225,52 @@ This executes all three layers sequentially: bronze → silver → gold.
 
 ## Orchestration with Airflow
 
-The pipeline is orchestrated by an Airflow DAG (`airflow/dags/saas_plg_pipeline.py`) that manages task dependencies and scheduling.
-
-### DAG: `saas_plg_analytics_pipeline`
-
-- **Schedule**: `@daily`
-- **Owner**: `data-engineering`
-- **Retries**: 1 (5-minute delay)
-- **Catchup**: Disabled
-
-### Task Dependency Graph
+The pipeline uses **8 independent per-table DAGs** with **Airflow Datasets** for cross-DAG scheduling. Each DAG follows a 3-task pattern with data quality gates:
 
 ```
-ingest_feature_releases ─┐
-ingest_user_signups ─────┤
-ingest_feature_usage ────┼──→ maintain_feature_states_scd ──→ build_feature_usage_facts ──→ calculate_feature_conversion_impact
-ingest_conversions ──────┘
+assert_input_quality -> process -> assert_output_quality
 ```
 
-- **Bronze tasks** run in parallel (no inter-dependencies)
-- **Silver tasks** run sequentially (SCD must complete before usage facts)
-- **Gold task** runs after all silver tasks complete
+### DAG Architecture
 
-### Tasks
+- **Bronze DAGs** (`@daily`): Produce Dataset events that trigger downstream DAGs
+- **Silver DAGs** (dataset-triggered): Run when upstream bronze Datasets are updated
+- **Gold DAG** (dataset-triggered): Runs when all upstream silver + bronze_conversions Datasets are updated
 
-| Task ID | Layer | Spark Job |
-|---------|-------|-----------|
-| `ingest_feature_releases` | Bronze | `bronze_ingestion.py` |
-| `ingest_user_signups` | Bronze | `bronze_ingestion.py` |
-| `ingest_feature_usage` | Bronze | `bronze_ingestion.py` |
-| `ingest_conversions` | Bronze | `bronze_ingestion.py` |
-| `maintain_feature_states_scd` | Silver | `silver_scd_transform.py` |
-| `build_feature_usage_facts` | Silver | `silver_scd_transform.py` |
-| `calculate_feature_conversion_impact` | Gold | `gold_cohort_analysis.py` |
+### Cross-DAG Dependency Map
+
+```
+bronze_feature_releases ────────> silver_feature_states ──────┐
+bronze_user_signups ─────┐                                    │
+bronze_conversions ──────┼──────> silver_user_dim ────────────┼──> gold_feature_conversion_impact
+                         │                                    │
+bronze_feature_usage_events ──> silver_feature_usage_facts ──┘
+bronze_conversions ──────────────────────────────────────────┘
+```
+
+### DAGs
+
+| DAG ID | Layer | Schedule | Produces Dataset |
+|--------|-------|----------|-----------------|
+| `bronze_feature_releases` | Bronze | `@daily` | `delta://bronze/feature_releases` |
+| `bronze_user_signups` | Bronze | `@daily` | `delta://bronze/user_signups` |
+| `bronze_feature_usage_events` | Bronze | `@daily` | `delta://bronze/feature_usage_events` |
+| `bronze_conversions` | Bronze | `@daily` | `delta://bronze/conversions` |
+| `silver_feature_states` | Silver | Dataset-triggered | `delta://silver/feature_states` |
+| `silver_user_dim` | Silver | Dataset-triggered | `delta://silver/user_dim` |
+| `silver_feature_usage_facts` | Silver | Dataset-triggered | `delta://silver/feature_usage_facts` |
+| `gold_feature_conversion_impact` | Gold | Dataset-triggered | `delta://gold/feature_conversion_impact` |
+
+### Data Quality Validation
+
+Each DAG includes input and output validation gates:
+- **Input validation**: Verifies upstream data exists, has correct schema, and is non-empty
+- **Output validation**: Verifies the produced Delta table has the expected schema and row count
+
+The validation framework (`spark/jobs/data_quality/validators.py`) provides:
+- `validate_schema()` - StructType field name and type checking
+- `validate_delta_table()` - Delta table existence, schema, and row count
+- `validate_raw_file()` - Raw file readability, schema, and non-emptiness
 
 ### Running Airflow
 
@@ -253,9 +287,10 @@ make test-airflow
 
 ### Validation
 
-1. Trigger DAG manually in Airflow UI
-2. Verify all tasks turn green
-3. Check task logs for errors
+1. Trigger any bronze DAG manually in Airflow UI
+2. Observe downstream silver/gold DAGs trigger automatically via Datasets
+3. Verify all 3 tasks (input quality, process, output quality) turn green
+4. Check task logs for errors
 
 ## Development
 
@@ -267,6 +302,9 @@ make test
 
 # Run Airflow DAG tests
 make test-airflow
+
+# Run all tests (Spark + Airflow)
+make test-all
 ```
 
 ### Code Quality
@@ -358,14 +396,14 @@ spark.read.format('delta').load('data/bronze/feature_releases').count()
 
 ```
 Raw Data (JSON/JSONL)
-    ↓                        ┌──────────────────────────┐
-[Bronze Layer] ─ parallel ─→ │   Airflow DAG (@daily)   │
-    ↓                        │   Orchestrates all tasks  │
-[Silver Layer] ─ sequential  │   with SparkSubmitOperator│
-    ↓                        └──────────────────────────┘
-[Gold Layer] - Business metrics & cohort analysis
     ↓
-Analytics & Reporting
+[Bronze DAGs] ─ @daily, parallel ──→ produce Datasets
+    ↓ (Dataset triggers)
+[Silver DAGs] ─ auto-triggered ────→ produce Datasets
+    ↓ (Dataset triggers)
+[Gold DAG] ─ auto-triggered ───────→ final analytics
+
+Each DAG: assert_input_quality -> process -> assert_output_quality
 ```
 
 ## Technology Stack
@@ -397,6 +435,7 @@ make ingest-gold          # Run gold layer aggregation
 make pipeline             # Run full pipeline (bronze → silver → gold)
 make test                 # Run Spark job unit tests
 make test-airflow         # Run Airflow DAG tests
+make test-all             # Run all tests (Spark + Airflow)
 make clean                # Remove cache and temp files
 make notebook             # Start Jupyter notebook server
 ```
@@ -406,7 +445,7 @@ make notebook             # Start Jupyter notebook server
 This is a learning/demonstration project. Feel free to:
 - Add more synthetic data scenarios
 - Implement additional analytics in the gold layer
-- Add data quality checks
+- Add more data quality validators
 - Improve error handling
 - Add more comprehensive tests
 

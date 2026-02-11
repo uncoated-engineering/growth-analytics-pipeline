@@ -1,4 +1,7 @@
-.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test test-airflow docker-up docker-down generate-data airflow-init notebook validate-bronze ingest-bronze ingest-silver ingest-gold pipeline
+.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test test-airflow test-all docker-up docker-down generate-data airflow-standalone airflow-init notebook validate-bronze ingest-bronze ingest-silver ingest-gold pipeline
+
+PROJECT_DIR := $(shell pwd)
+DAGS_DIR := $(PROJECT_DIR)/airflow/dags
 
 help:
 	@echo "Available commands:"
@@ -13,8 +16,9 @@ help:
 	@echo "  make pre-commit-install   - Install pre-commit hooks"
 	@echo "  make pre-commit-run       - Run pre-commit hooks on all files"
 	@echo "  make pre-commit-update    - Update pre-commit hooks to latest versions"
-	@echo "  make test                 - Run tests"
+	@echo "  make test                 - Run Spark job tests"
 	@echo "  make test-airflow         - Run Airflow DAG tests"
+	@echo "  make test-all             - Run all tests (Spark + Airflow)"
 	@echo "  make docker-up            - Start Docker services"
 	@echo "  make docker-down          - Stop Docker services"
 	@echo "  make generate-data        - Generate synthetic data"
@@ -23,6 +27,7 @@ help:
 	@echo "  make ingest-silver        - Run silver layer transformation (SCD Type 2)"
 	@echo "  make ingest-gold          - Run gold layer aggregation (cohort analysis)"
 	@echo "  make pipeline             - Run full pipeline (bronze → silver → gold)"
+	@echo "  make airflow-standalone    - Start Airflow standalone (webserver + scheduler)"
 	@echo "  make airflow-init         - Initialize Airflow database"
 	@echo "  make notebook             - Start Jupyter notebook server"
 
@@ -95,6 +100,10 @@ test-airflow:
 	@echo "Running Airflow DAG tests..."
 	uv run pytest airflow/tests/ -v
 
+test-all:
+	@echo "Running all tests (Spark + Airflow)..."
+	uv run pytest spark/tests/ airflow/tests/ -v
+
 docker-up:
 	@echo "Starting Docker services..."
 	docker-compose -f docker/docker-compose.yml up -d
@@ -106,6 +115,10 @@ docker-down:
 generate-data:
 	@echo "Generating synthetic data..."
 	uv run python scripts/generate_synthetic_data.py
+
+airflow-standalone:
+	@echo "Starting Airflow standalone with DAGs from $(DAGS_DIR)..."
+	AIRFLOW__CORE__DAGS_FOLDER=$(DAGS_DIR) uv run airflow standalone
 
 airflow-init:
 	@echo "Initializing Airflow database..."
