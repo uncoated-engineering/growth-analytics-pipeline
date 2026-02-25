@@ -1,0 +1,443 @@
+# =============================================================================
+# Growth Analytics Pipeline - Declarative Manifest
+# =============================================================================
+# Single source of truth for the entire data pipeline. Declares all tables,
+# schemas, transformations, quality rules, dependencies, and metrics.
+#
+# This manifest drives:
+#   - Schema generation (YAML -> PySpark StructTypes)
+#   - Bronze ingestion (config-driven extraction)
+#   - Data quality validation (declarative rules)
+#   - Airflow DAG generation (auto-generated from manifest)
+#   - Pipeline lineage & impact analysis
+#   - Data freshness SLAs
+# =============================================================================
+
+version: "1.0"
+name: growth-analytics-pipeline
+description: >
+  SaaS Product-Led Growth analytics pipeline using medallion architecture.
+  Analyzes user behavior, feature adoption, and conversion patterns to
+  determine which features drive paid conversions.
+
+# ---------------------------------------------------------------------------
+# Path configuration
+# ---------------------------------------------------------------------------
+paths:
+  raw: data/raw
+  bronze: data/bronze
+  silver: data/silver
+  gold: data/gold
+
+# ---------------------------------------------------------------------------
+# Bronze Layer - Raw Data Ingestion
+# ---------------------------------------------------------------------------
+# Bronze tables are fully declarative: the engine reads source files,
+# applies transformations, and writes Delta tables without custom code.
+# ---------------------------------------------------------------------------
+bronze:
+  feature_releases:
+    description: "Product feature releases and version history"
+    source:
+      file: feature_releases.json
+      format: json
+      options:
+        multiLine: "true"
+
+    schema:
+      input:
+        - {name: id, type: integer}
+        - {name: name, type: string}
+        - {name: release_date, type: string}
+        - {name: version, type: string}
+      output:
+        - {name: feature_id, type: integer}
+        - {name: feature_name, type: string}
+        - {name: release_date, type: string}
+        - {name: version, type: string}
+        - {name: ingestion_timestamp, type: timestamp}
+
+    transformations:
+      - type: rename
+        columns: {id: feature_id, name: feature_name}
+      - type: add_column
+        name: ingestion_timestamp
+        function: current_timestamp
+
+    write:
+      mode: append
+
+    quality_rules:
+      input:
+        - {rule: not_null, columns: [id, name, release_date, version]}
+      output:
+        - {rule: not_null, columns: [feature_id, feature_name]}
+        - {rule: min_rows, value: 1}
+
+    freshness:
+      max_age_hours: 24
+      alert_channel: data-engineering
+
+    airflow:
+      schedule: "@daily"
+      dataset: "delta://bronze/feature_releases"
+
+  user_signups:
+    description: "User registration events with demographics"
+    source:
+      file: user_signups.jsonl
+      format: json
+
+    schema:
+      input:
+        - {name: user_id, type: integer}
+        - {name: email, type: string}
+        - {name: signup_date, type: string}
+        - {name: company_size, type: string}
+        - {name: industry, type: string}
+      output:
+        - {name: user_id, type: integer}
+        - {name: email, type: string}
+        - {name: signup_date, type: string}
+        - {name: company_size, type: string}
+        - {name: industry, type: string}
+        - {name: ingestion_timestamp, type: timestamp}
+
+    transformations:
+      - type: add_column
+        name: ingestion_timestamp
+        function: current_timestamp
+
+    write:
+      mode: append
+      partition_by: [signup_date]
+
+    quality_rules:
+      input:
+        - {rule: not_null, columns: [user_id, email, signup_date]}
+        - {rule: unique, columns: [user_id]}
+      output:
+        - {rule: not_null, columns: [user_id, email]}
+        - {rule: min_rows, value: 1}
+
+    freshness:
+      max_age_hours: 24
+
+    airflow:
+      schedule: "@daily"
+      dataset: "delta://bronze/user_signups"
+
+  feature_usage_events:
+    description: "Granular feature usage telemetry events"
+    source:
+      file: feature_usage_events.jsonl
+      format: json
+
+    schema:
+      input:
+        - {name: timestamp, type: string}
+        - {name: user_id, type: integer}
+        - {name: feature_id, type: integer}
+        - {name: feature_name, type: string}
+        - {name: event_type, type: string}
+      output:
+        - {name: event_id, type: long}
+        - {name: user_id, type: integer}
+        - {name: feature_id, type: integer}
+        - {name: feature_name, type: string}
+        - {name: event_type, type: string}
+        - {name: event_timestamp, type: timestamp}
+        - {name: event_date, type: date}
+        - {name: ingestion_timestamp, type: timestamp}
+
+    transformations:
+      - type: convert_timestamp
+        source: timestamp
+        target: event_timestamp
+        format: "yyyy-MM-dd HH:mm:ss"
+        drop_source: true
+      - type: cast
+        source: event_timestamp
+        target: event_date
+        to: date
+      - type: add_column
+        name: ingestion_timestamp
+        function: current_timestamp
+      - type: add_column
+        name: event_id
+        function: monotonically_increasing_id
+      - type: select
+        columns: [event_id, user_id, feature_id, feature_name, event_type,
+                  event_timestamp, event_date, ingestion_timestamp]
+
+    write:
+      mode: append
+      partition_by: [event_date]
+
+    quality_rules:
+      input:
+        - {rule: not_null, columns: [timestamp, user_id, feature_id]}
+        - {rule: accepted_values, column: event_type, values: [click, view, usage]}
+      output:
+        - {rule: not_null, columns: [event_id, user_id, feature_id]}
+        - {rule: min_rows, value: 1}
+
+    freshness:
+      max_age_hours: 6
+
+    airflow:
+      schedule: "@daily"
+      dataset: "delta://bronze/feature_usage_events"
+
+  conversions:
+    description: "Free-to-paid conversion events with plan and MRR"
+    source:
+      file: conversions.jsonl
+      format: json
+
+    schema:
+      input:
+        - {name: user_id, type: integer}
+        - {name: conversion_date, type: string}
+        - {name: plan, type: string}
+        - {name: mrr, type: integer}
+        - {name: signup_date, type: string}
+        - {name: days_to_convert, type: integer}
+        - {name: used_real_time_collab, type: boolean}
+      output:
+        - {name: user_id, type: integer}
+        - {name: conversion_date, type: string}
+        - {name: plan, type: string}
+        - {name: mrr, type: integer}
+        - {name: signup_date, type: string}
+        - {name: days_to_convert, type: integer}
+        - {name: used_real_time_collab, type: boolean}
+        - {name: ingestion_timestamp, type: timestamp}
+
+    transformations:
+      - type: add_column
+        name: ingestion_timestamp
+        function: current_timestamp
+
+    write:
+      mode: append
+
+    quality_rules:
+      input:
+        - {rule: not_null, columns: [user_id, conversion_date, plan, mrr]}
+        - {rule: range, column: mrr, min: 0}
+        - {rule: accepted_values, column: plan, values: [Pro, Enterprise, Business]}
+      output:
+        - {rule: not_null, columns: [user_id, conversion_date, plan]}
+        - {rule: min_rows, value: 1}
+
+    freshness:
+      max_age_hours: 24
+
+    airflow:
+      schedule: "@daily"
+      dataset: "delta://bronze/conversions"
+
+# ---------------------------------------------------------------------------
+# Silver Layer - Cleaned & Transformed Data
+# ---------------------------------------------------------------------------
+# Silver tables use custom transformation logic (SCD, joins, aggregations)
+# but their schemas, quality rules, and dependencies are declared here.
+# ---------------------------------------------------------------------------
+silver:
+  feature_states:
+    description: "SCD Type 2 dimension tracking feature version history"
+    transformation: custom
+    module: spark.jobs.silver.feature_states.transformation
+    function: maintain_feature_states_scd
+
+    depends_on:
+      - bronze.feature_releases
+
+    schema:
+      output:
+        - {name: feature_id, type: integer, nullable: false}
+        - {name: feature_name, type: string, nullable: false}
+        - {name: version, type: string, nullable: false}
+        - {name: is_enabled, type: boolean, nullable: false}
+        - {name: effective_from, type: date, nullable: false}
+        - {name: effective_to, type: date, nullable: false}
+        - {name: is_current, type: boolean, nullable: false}
+        - {name: record_hash, type: string, nullable: false}
+
+    quality_rules:
+      output:
+        - {rule: not_null, columns: [feature_id, feature_name, version]}
+        - {rule: min_rows, value: 1}
+        - rule: custom_sql
+          description: "Every feature must have exactly one current record"
+          sql: >
+            SELECT feature_id, COUNT(*) as cnt
+            FROM {table}
+            WHERE is_current = true
+            GROUP BY feature_id
+            HAVING cnt != 1
+
+    freshness:
+      max_age_hours: 25
+
+    airflow:
+      schedule:
+        datasets: ["delta://bronze/feature_releases"]
+      dataset: "delta://silver/feature_states"
+
+  user_dim:
+    description: "User dimension with plan enrichment from conversions"
+    transformation: custom
+    module: spark.jobs.silver.user_dim.transformation
+    function: maintain_user_dim
+
+    depends_on:
+      - bronze.user_signups
+      - bronze.conversions
+
+    schema:
+      output:
+        - {name: user_id, type: integer}
+        - {name: signup_date, type: date}
+        - {name: company_size, type: string}
+        - {name: industry, type: string}
+        - {name: current_plan, type: string}
+
+    quality_rules:
+      output:
+        - {rule: not_null, columns: [user_id, signup_date, current_plan]}
+        - {rule: unique, columns: [user_id]}
+        - {rule: min_rows, value: 1}
+        - rule: accepted_values
+          column: current_plan
+          values: [free, Pro, Enterprise, Business]
+
+    freshness:
+      max_age_hours: 25
+
+    airflow:
+      schedule:
+        datasets: ["delta://bronze/user_signups", "delta://bronze/conversions"]
+      dataset: "delta://silver/user_dim"
+
+  feature_usage_facts:
+    description: "Per-user per-feature usage aggregations"
+    transformation: custom
+    module: spark.jobs.silver.feature_usage_facts.transformation
+    function: create_feature_usage_facts
+
+    depends_on:
+      - bronze.feature_usage_events
+
+    schema:
+      output:
+        - {name: user_id, type: integer}
+        - {name: feature_id, type: integer}
+        - {name: first_used_date, type: date}
+        - {name: last_used_date, type: date}
+        - {name: total_usage_count, type: long}
+        - {name: avg_daily_usage, type: double}
+        - {name: as_of_date, type: date}
+
+    quality_rules:
+      output:
+        - {rule: not_null, columns: [user_id, feature_id, total_usage_count]}
+        - {rule: range, column: total_usage_count, min: 1}
+        - {rule: min_rows, value: 1}
+
+    freshness:
+      max_age_hours: 7
+
+    airflow:
+      schedule:
+        datasets: ["delta://bronze/feature_usage_events"]
+      dataset: "delta://silver/feature_usage_facts"
+
+# ---------------------------------------------------------------------------
+# Gold Layer - Business Analytics
+# ---------------------------------------------------------------------------
+# Gold tables produce final business metrics. Complex logic stays in code,
+# but KPIs and metrics are declared here for documentation and monitoring.
+# ---------------------------------------------------------------------------
+gold:
+  feature_conversion_impact:
+    description: >
+      Cohort analysis measuring the impact of feature adoption on conversion.
+      For each feature, users are grouped into cohorts (used_feature,
+      available_not_used, not_available) and conversion metrics are compared.
+    transformation: custom
+    module: spark.jobs.gold.feature_conversion_impact.aggregation
+    function: calculate_feature_conversion_impact
+
+    depends_on:
+      - silver.user_dim
+      - silver.feature_states
+      - silver.feature_usage_facts
+      - bronze.conversions
+
+    schema:
+      output:
+        - {name: feature_name, type: string}
+        - {name: cohort, type: string}
+        - {name: total_users, type: long}
+        - {name: converted_users, type: long}
+        - {name: conversion_rate, type: double}
+        - {name: avg_days_to_convert, type: double}
+        - {name: avg_mrr, type: double}
+
+    quality_rules:
+      output:
+        - {rule: not_null, columns: [feature_name, cohort, total_users]}
+        - rule: accepted_values
+          column: cohort
+          values: [used_feature, available_not_used, not_available]
+        - {rule: range, column: conversion_rate, min: 0.0, max: 1.0}
+        - {rule: range, column: avg_mrr, min: 0}
+        - {rule: min_rows, value: 1}
+
+    freshness:
+      max_age_hours: 26
+
+    airflow:
+      schedule:
+        datasets:
+          - "delta://silver/user_dim"
+          - "delta://silver/feature_states"
+          - "delta://silver/feature_usage_facts"
+          - "delta://bronze/conversions"
+      dataset: "delta://gold/feature_conversion_impact"
+
+    # Declarative KPI/metric definitions for monitoring and alerting
+    metrics:
+      - name: feature_adoption_lift
+        description: >
+          Ratio of conversion rate for 'used_feature' cohort vs
+          'available_not_used' cohort. Values > 1 indicate feature
+          usage correlates with higher conversion.
+        formula: "conversion_rate[used_feature] / conversion_rate[available_not_used]"
+        threshold:
+          warning: 1.5
+          critical: 1.0
+          direction: above
+
+      - name: avg_conversion_acceleration
+        description: >
+          Difference in avg_days_to_convert between 'available_not_used'
+          and 'used_feature' cohorts. Positive values mean feature users
+          convert faster.
+        formula: "avg_days_to_convert[available_not_used] - avg_days_to_convert[used_feature]"
+        threshold:
+          warning: 3
+          critical: 0
+          direction: above
+
+      - name: feature_revenue_lift
+        description: >
+          Ratio of avg_mrr for 'used_feature' vs 'available_not_used'.
+          Values > 1 indicate feature users generate more revenue.
+        formula: "avg_mrr[used_feature] / avg_mrr[available_not_used]"
+        threshold:
+          warning: 1.1
+          critical: 1.0
+          direction: above

@@ -1207,6 +1207,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "pyspark" },
+    { name = "pyyaml" },
     { name = "seaborn" },
 ]
 
@@ -1236,6 +1237,7 @@ requires-dist = [
     { name = "pyspark", specifier = ">=3.5.0,<4.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.4" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.11" },
     { name = "seaborn", specifier = ">=0.13.1" },
 ]

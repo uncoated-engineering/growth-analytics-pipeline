@@ -1,33 +1,55 @@
-.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test test-airflow test-all docker-up docker-down generate-data airflow-standalone airflow-init notebook validate-bronze ingest-bronze ingest-silver ingest-gold pipeline
+.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test test-airflow test-all docker-up docker-down generate-data airflow-standalone airflow-init notebook validate-bronze ingest-bronze ingest-silver ingest-gold pipeline pipeline-info pipeline-lineage pipeline-dot pipeline-impact pipeline-upstream pipeline-health pipeline-validate declarative-ingest-bronze pipeline-quality pipeline-metrics
 
 PROJECT_DIR := $(shell pwd)
 DAGS_DIR := $(PROJECT_DIR)/airflow/dags
 
 help:
 	@echo "Available commands:"
+	@echo ""
+	@echo "  Setup & Dependencies:"
 	@echo "  make setup                - Create Python environment and install dependencies"
 	@echo "  make install              - Install Python dependencies"
 	@echo "  make install-dev          - Install dependencies with dev tools"
 	@echo "  make sync                 - Sync dependencies from pyproject.toml"
 	@echo "  make clean                - Clean up temporary files and caches"
+	@echo ""
+	@echo "  Code Quality:"
 	@echo "  make format               - Format code with black and ruff"
 	@echo "  make lint                 - Lint code with ruff"
 	@echo "  make assert-typing        - Check type hints with mypy"
 	@echo "  make pre-commit-install   - Install pre-commit hooks"
 	@echo "  make pre-commit-run       - Run pre-commit hooks on all files"
 	@echo "  make pre-commit-update    - Update pre-commit hooks to latest versions"
+	@echo ""
+	@echo "  Testing:"
 	@echo "  make test                 - Run Spark job tests"
 	@echo "  make test-airflow         - Run Airflow DAG tests"
 	@echo "  make test-all             - Run all tests (Spark + Airflow)"
-	@echo "  make docker-up            - Start Docker services"
-	@echo "  make docker-down          - Stop Docker services"
+	@echo ""
+	@echo "  Pipeline (Imperative):"
 	@echo "  make generate-data        - Generate synthetic data"
 	@echo "  make validate-bronze      - Validate raw data before bronze ingestion"
 	@echo "  make ingest-bronze        - Run bronze layer ingestion (raw to Delta)"
 	@echo "  make ingest-silver        - Run silver layer transformation (SCD Type 2)"
 	@echo "  make ingest-gold          - Run gold layer aggregation (cohort analysis)"
-	@echo "  make pipeline             - Run full pipeline (bronze → silver → gold)"
-	@echo "  make airflow-standalone    - Start Airflow standalone (webserver + scheduler)"
+	@echo "  make pipeline             - Run full pipeline (bronze -> silver -> gold)"
+	@echo ""
+	@echo "  Pipeline (Declarative):"
+	@echo "  make pipeline-info        - Show pipeline summary from manifest"
+	@echo "  make pipeline-lineage     - Show dependency lineage graph"
+	@echo "  make pipeline-dot         - Generate Graphviz DOT lineage graph"
+	@echo "  make pipeline-impact T=x  - Impact analysis (e.g., T=bronze.feature_releases)"
+	@echo "  make pipeline-upstream T=x - Upstream trace (e.g., T=gold.feature_conversion_impact)"
+	@echo "  make pipeline-health      - Pipeline health dashboard"
+	@echo "  make pipeline-validate    - Validate pipeline.yaml manifest"
+	@echo "  make declarative-ingest-bronze - Run declarative bronze ingestion"
+	@echo "  make pipeline-quality     - Run declarative quality validation"
+	@echo "  make pipeline-metrics     - Evaluate gold-layer KPI metrics"
+	@echo ""
+	@echo "  Infrastructure:"
+	@echo "  make docker-up            - Start Docker services"
+	@echo "  make docker-down          - Stop Docker services"
+	@echo "  make airflow-standalone   - Start Airflow standalone (webserver + scheduler)"
 	@echo "  make airflow-init         - Initialize Airflow database"
 	@echo "  make notebook             - Start Jupyter notebook server"
 
@@ -152,4 +174,41 @@ pipeline:
 	@echo ""
 	@make ingest-gold
 	@echo ""
-	@echo "✓ Full pipeline complete!"
+	@echo "Full pipeline complete!"
+
+# ---------------------------------------------------------------------------
+# Declarative Pipeline Commands (powered by pipeline.yaml)
+# ---------------------------------------------------------------------------
+
+pipeline-info:
+	@uv run python -m spark.jobs.declarative.cli info
+
+pipeline-lineage:
+	@uv run python -m spark.jobs.declarative.cli lineage
+
+pipeline-dot:
+	@uv run python -m spark.jobs.declarative.cli dot
+
+pipeline-impact:
+	@uv run python -m spark.jobs.declarative.cli impact $(T)
+
+pipeline-upstream:
+	@uv run python -m spark.jobs.declarative.cli upstream $(T)
+
+pipeline-health:
+	@uv run python -m spark.jobs.declarative.cli health
+
+pipeline-validate:
+	@uv run python -m spark.jobs.declarative.cli validate
+
+declarative-ingest-bronze:
+	@echo "Running declarative bronze ingestion..."
+	@uv run python -m spark.jobs.declarative.cli ingest-bronze
+
+pipeline-quality:
+	@echo "Running declarative quality validation..."
+	@uv run python -m spark.jobs.declarative.cli quality
+
+pipeline-metrics:
+	@echo "Evaluating gold-layer metrics..."
+	@uv run python -m spark.jobs.declarative.cli metrics

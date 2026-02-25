@@ -17,6 +17,9 @@ dependencies = [
     "apache-airflow>=2.8.0",
     "apache-airflow-providers-apache-spark>=4.7.0",
 
+    # Declarative Pipeline
+    "pyyaml>=6.0",
+
     # Data Generation & Processing
     "faker>=22.0.0",
     "pandas>=2.1.4",
