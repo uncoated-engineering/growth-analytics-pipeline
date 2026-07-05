@@ -13,7 +13,7 @@ import pytest
 from airflow.models import DagBag
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
-DAGS_FOLDER = os.path.join(os.path.dirname(__file__), "..", "dags")
+DAGS_FOLDER = os.path.join(os.path.dirname(__file__), "..", "..", "..", "airflow", "dags")
 
 
 @pytest.fixture(scope="module")
