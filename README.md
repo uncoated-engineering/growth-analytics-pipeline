@@ -1,465 +1,214 @@
-# Growth Analytics Pipeline
+# Growth Analytics Platform
 
-A SaaS Product-Led Growth (PLG) analytics pipeline built with Apache Spark, Delta Lake, and Apache Airflow. This project demonstrates a modern data lakehouse architecture for analyzing user behavior, feature adoption, and conversion patterns.
+[![CI](https://github.com/uncoated-engineering/growth-analytics-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/uncoated-engineering/growth-analytics-pipeline/actions/workflows/ci.yml)
 
-## Architecture
+An end-to-end **data platform for a (synthetic) SaaS product-led-growth company** —
+from raw event feeds to governed metrics to a natural-language analytics chatbot.
 
-The pipeline follows a medallion architecture with three layers:
+Built as a portfolio project to demonstrate the full data stack: lakehouse
+engineering (Spark + Delta), orchestration (Airflow Datasets), data
+governance (contracts, dictionary, lineage, contract tests), a semantic layer
+(DuckDB serving), and an LLM analytics agent (Claude tool use) — all wired
+together so that a single YAML contract per table drives the docs, the
+lineage graph, the chatbot's grounding, and the CI checks that keep them honest.
 
-- **Bronze Layer**: Raw data ingestion from JSON/JSONL to Delta Lake
-- **Silver Layer**: Data transformation with SCD Type 2 (Slowly Changing Dimensions)
-- **Gold Layer**: Business-level aggregations and analytics (cohort analysis)
-
-## Project Structure
-
-```
-growth-analytics-pipeline/
-├── data/
-│   ├── raw/                    # Raw JSON/JSONL source data
-│   ├── bronze/                 # Bronze Delta tables (raw ingestion)
-│   ├── silver/                 # Silver Delta tables (cleaned & transformed)
-│   └── gold/                   # Gold Delta tables (aggregated analytics)
-├── spark/
-│   ├── jobs/
-│   │   ├── data_quality/            # Shared validation framework
-│   │   │   └── validators.py
-│   │   ├── bronze/
-│   │   │   ├── feature_releases/    # schema, extract, validate, main
-│   │   │   ├── user_signups/
-│   │   │   ├── feature_usage_events/
-│   │   │   ├── conversions/
-│   │   │   └── main.py              # Layer-level orchestrator (make pipeline)
-│   │   ├── silver/
-│   │   │   ├── feature_states/      # schema, transformation, validate, main
-│   │   │   ├── user_dim/
-│   │   │   ├── feature_usage_facts/
-│   │   │   └── main.py
-│   │   └── gold/
-│   │       ├── feature_conversion_impact/  # schema, aggregation, validate, main
-│   │       └── main.py
-│   └── tests/                  # Unit tests
-├── airflow/
-│   ├── dags/                   # Per-table DAG definitions
-│   │   ├── config.py                # Shared config, Dataset definitions
-│   │   ├── bronze_feature_releases.py
-│   │   ├── bronze_user_signups.py
-│   │   ├── bronze_feature_usage_events.py
-│   │   ├── bronze_conversions.py
-│   │   ├── silver_feature_states.py
-│   │   ├── silver_user_dim.py
-│   │   ├── silver_feature_usage_facts.py
-│   │   └── gold_feature_conversion_impact.py
-│   ├── plugins/                # Custom Airflow operators
-│   └── tests/                  # DAG tests
-│       └── test_dag.py
-├── scripts/
-│   └── generate_synthetic_data.py   # Generate test data
-├── notebooks/
-│   └── analysis_demo.ipynb    # PLG analysis demo & visualizations
-├── docker/                     # Docker compose for services
-├── agent_instructions/         # Implementation guidelines
-├── pyproject.toml             # Project dependencies (UV/pip)
-└── Makefile                   # Common commands
-
+```mermaid
+flowchart LR
+  subgraph sources["Raw sources (JSONL)"]
+    src[signups · usage events · conversions<br/>subscription events · attribution · releases]
+  end
+  subgraph lakehouse["Delta Lakehouse (PySpark)"]
+    bronze["Bronze<br/>6 tables · append, raw"]
+    silver["Silver<br/>4 tables · SCD2, periodization"]
+    gold["Gold<br/>4 marts · MRR waterfall, NRR,<br/>channels, engagement, cohorts"]
+    bronze --> silver --> gold
+  end
+  subgraph serving["Serving"]
+    duck["DuckDB engine<br/>(reads current Delta snapshot)"]
+    sem["Semantic layer<br/>20+ governed metrics"]
+    bot["Analytics chatbot<br/>(Claude + tool use)"]
+    duck --> sem --> bot
+  end
+  src --> bronze
+  gold --> duck
+  silver --> duck
+  airflow["Airflow<br/>14 DAGs · Dataset-triggered"] -.orchestrates.-> lakehouse
+  contracts["Data contracts (YAML)<br/>dictionary · lineage · grounding"] -.govern.-> serving
+  contracts -.tested against.-> lakehouse
 ```
 
-## Getting Started
+## Highlights
 
-### Prerequisites
+| Layer | What's here | Where |
+|---|---|---|
+| **Ingestion & modeling** | Medallion architecture on Delta Lake; SCD Type 2 with `MERGE`; subscription event periodization; MRR waterfall consistent by construction | `spark/jobs/` |
+| **Orchestration** | 14 per-table Airflow DAGs wired by **Datasets** (data-aware scheduling), each with input/output data-quality gates | `airflow/dags/` |
+| **Governance** | One YAML **contract** per table → generated data dictionary + OpenLineage-style lineage; **contract tests** assert contracts == Spark schemas == Airflow wiring | `contracts/`, `docs/`, `tests/semantic/` |
+| **Semantic layer** | Governed metrics as SQL aggregate expressions (ratios of sums — no "average of averages"), compiled and validated, served by DuckDB over the exact Delta snapshot | `semantic/` |
+| **AI analytics** | Chatbot that answers business questions via two tools — governed metric queries and guarded read-only SQL — showing every query it runs | `chatbot/` |
+| **Engineering practice** | CI (lint/format/types/tests), tests mirroring the source tree, pre-commit hooks, ADRs for every major decision | `.github/`, `tests/`, `docs/adr/` |
 
-- Python 3.12+
-- UV (recommended) or pip
-- Java 11+ (for Spark)
-- Docker & Docker Compose (optional, for Airflow)
+## The data story
 
-### Installation
+`scripts/generate_synthetic_data.py` generates one year (2024) of PLG SaaS
+data for 5,000 users with **engineered causal signals**, so every downstream
+analysis has ground truth to find (ADR 0004):
 
-1. **Create Python environment and install dependencies:**
+- **Feature adoption drives conversion** — per-feature conversion boosts;
+  `real_time_collab` users convert at ~40% vs ~21% without.
+- **Channel quality drives funnel performance** — referral converts at ~41%,
+  outbound at ~22%; ~5% of signups are deliberately unattributed.
+- **Feature adoption drives retention** — each adopted feature lowers the
+  monthly churn hazard in the subscription lifecycle simulation.
+- **MRR compounds realistically** — new business, seat expansion/contraction,
+  plan changes, and churn produce a waterfall growing $0 → ~$2.3M ending MRR
+  with NRR hovering around 100%.
+
+## Quickstart
+
+Prereqs: Python 3.12+, [uv](https://docs.astral.sh/uv/), Java 11+ (for Spark).
 
 ```bash
-make setup
+make setup            # create venv, install dependencies
+make generate-data    # synthesize the raw sources (seeded, reproducible)
+make pipeline         # bronze → silver → gold (full Delta lakehouse)
+
+# Explore
+uv run python -m semantic.cli tables
+uv run python -m semantic.cli query conversion_rate -d acquisition_channel
+uv run python -m semantic.cli query ending_mrr net_revenue_retention -d month
+uv run python -m semantic.cli sql "SELECT current_plan, count(*) FROM silver_user_dim GROUP BY 1"
+
+# Chat with the data (needs ANTHROPIC_API_KEY)
+make chatbot                     # Streamlit app
+uv run python -m chatbot.cli "Which acquisition channel brings the best customers?"
 ```
 
-Or manually:
+Example — the semantic layer answering from the governed catalog:
+
+```text
+$ uv run python -m semantic.cli query conversion_rate signups -d acquisition_channel -o "conversion_rate desc"
+acquisition_channel  conversion_rate      signups
+-------------------------------------------------
+referral             0.412573673870334    509
+content_marketing    0.35929203539823007  565
+organic_search       0.33976510067114096  1192
+unattributed         0.336283185840708    226
+partner              0.2900763358778626   393
+paid_search          0.2760041194644696   971
+paid_social          0.2189265536723164   708
+outbound             0.21788990825688073  436
+```
+
+## The lakehouse
+
+Fourteen Delta tables across three layers — full column-level documentation in
+the generated **[data dictionary](docs/data_dictionary.md)** and the
+**[lineage graph](docs/lineage.md)** (both regenerated from `contracts/` via
+`make docs`).
+
+| Layer | Tables |
+|---|---|
+| Bronze (raw, append) | `feature_releases`, `user_signups`, `feature_usage_events`, `conversions`, `marketing_attribution`, `subscription_events` |
+| Silver (conformed) | `silver_feature_states` (SCD2), `silver_user_dim`, `silver_feature_usage_facts`, `silver_subscription_periods` |
+| Gold (marts) | `gold_feature_conversion_impact`, `gold_mrr_waterfall`, `gold_channel_performance`, `gold_weekly_engagement` |
+
+Modeling choices worth reading: subscription lifecycle as an **event log
+periodized in silver** (ADR 0005) and an MRR waterfall whose identity
+`ending = starting + net_new` holds **by construction** every month.
+
+## Orchestration
+
+Airflow runs one DAG per table with a uniform quality-gated chain:
+
+```
+assert_input_quality  >>  process  >>  assert_output_quality
+```
+
+Bronze DAGs run `@daily` and publish **Airflow Datasets**
+(`delta://bronze/<table>`); silver and gold DAGs are triggered *by data*, not
+by the clock — their schedule is the list of upstream Datasets (ADR 0003).
+A governance test asserts the DAG wiring matches the lineage declared in the
+contracts, so orchestration and documentation cannot drift apart.
 
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate
-uv sync
+make airflow-standalone    # local Airflow with all 14 DAGs
 ```
 
-2. **Install pre-commit hooks (recommended):**
+## Governance: contracts as the single source of truth
 
-```bash
-make pre-commit-install
-```
+Every table has a YAML contract (`contracts/<layer>/<table>.yml`) declaring
+its description, grain, owner, typed columns, and upstreams. Everything else
+derives from it:
 
-This sets up automatic code quality checks before each commit.
+- `docs/data_dictionary.md`, `docs/lineage.md`, `docs/lineage.json` — generated, never hand-edited
+- the chatbot's schema grounding — rendered from the same objects
+- **contract tests** — CI fails if a contract disagrees with the Spark job's
+  `StructType`, or if declared upstreams disagree with the Airflow Dataset wiring
 
-2. **Generate synthetic data:**
+## Semantic layer
 
-```bash
-make generate-data
-```
+Metrics are defined once in `semantic/metrics.yml` as SQL aggregate
+expressions over a single table, with an allow-list of dimensions. Ratio
+metrics are ratios of sums, so **any** regrouping stays correct. A compiler
+validates requests and emits DuckDB SQL; the engine resolves each Delta
+table's *current* snapshot through delta-rs (never stale parquet). See
+ADR 0006 for why this beats bolting on dbt or a metrics service here.
 
-This creates sample data files in `data/raw/`:
-- `feature_releases.json` - Product feature releases
-- `user_signups.jsonl` - User registration data
-- `feature_usage_events.jsonl` - Feature interaction events
-- `conversions.jsonl` - User conversion events
+## The analytics chatbot
 
-## Pipeline Execution
-
-### Bronze Layer - Raw Data Ingestion
-
-The bronze layer ingests raw JSON/JSONL files into Delta Lake tables with minimal transformation.
-
-**Run bronze ingestion:**
-
-```bash
-make ingest-bronze
-```
-
-**What it does:**
-
-1. **Feature Releases**: Reads `feature_releases.json` (JSON array)
-   - Schema: `feature_id, feature_name, release_date, version, ingestion_timestamp`
-   - Output: `data/bronze/feature_releases/`
-
-2. **User Signups**: Reads `user_signups.jsonl` (JSONL)
-   - Schema: `user_id, email, signup_date, company_size, industry, ingestion_timestamp`
-   - Partitioned by: `signup_date`
-   - Output: `data/bronze/user_signups/`
-
-3. **Feature Usage Events**: Reads `feature_usage_events.jsonl` (JSONL)
-   - Schema: `event_id, user_id, feature_id, feature_name, event_type, event_timestamp, event_date, ingestion_timestamp`
-   - Partitioned by: `event_date` (for query performance)
-   - Output: `data/bronze/feature_usage_events/`
-
-4. **Conversions**: Reads `conversions.jsonl` (JSONL)
-   - Schema: `user_id, conversion_date, plan, mrr, signup_date, days_to_convert, used_real_time_collab, ingestion_timestamp`
-   - Output: `data/bronze/conversions/`
-
-**Features:**
-- All tables use Delta Lake format for ACID transactions
-- Automatic schema inference with type safety
-- Partition pruning for large tables (events, signups)
-- Idempotent writes in append mode
-- Automatic `ingestion_timestamp` for data lineage
-
-### Silver Layer - SCD Type 2 Transformation
-
-The silver layer transforms bronze data into analytical-ready tables using Slowly Changing Dimensions (SCD) Type 2 for historical tracking.
-
-**Run silver transformation:**
-
-```bash
-make ingest-silver
-```
-
-**What it does:**
-
-1. **Feature States (SCD Type 2)**: Tracks feature version history with change detection
-   - Schema: `feature_id, feature_name, version, is_enabled, effective_from, effective_to, is_current, record_hash`
-   - Uses Delta MERGE with staged updates pattern for atomic upserts
-   - `record_hash` (MD5 of feature_name + version) detects changes
-   - `effective_to = 9999-12-31` marks current records; old versions get closed with the new version's effective date
-   - Output: `data/silver/silver_feature_states/`
-
-2. **User Dimension**: Simplified user dimension enriched with conversion data
-   - Schema: `user_id, signup_date, company_size, industry, current_plan`
-   - Joins signups with latest conversion; defaults to `'free'` for non-converted users
-   - Output: `data/silver/silver_user_dim/`
-
-3. **Feature Usage Facts**: Aggregated per-user, per-feature usage summaries
-   - Schema: `user_id, feature_id, first_used_date, last_used_date, total_usage_count, avg_daily_usage, as_of_date`
-   - Enables "used before conversion" analysis via `first_used_date`
-   - `as_of_date` supports time-point snapshot queries
-   - Output: `data/silver/silver_feature_usage_facts/`
-
-**Features:**
-- SCD Type 2 with Delta MERGE for atomic close-and-insert operations
-- Idempotent: re-running with unchanged data produces no duplicates
-- Time-travel queries: filter by `effective_from`/`effective_to` for point-in-time state
-- Change detection via MD5 record hashing
-
-### Gold Layer - Cohort Analysis
-
-The gold layer builds business-level analytics from silver and bronze data, answering the key question: **"Does feature adoption drive conversion?"**
-
-**Run gold aggregation:**
-
-```bash
-make ingest-gold
-```
-
-**What it does:**
-
-1. **Feature Conversion Impact**: Cohort analysis correlating feature usage with conversion rates
-   - Schema: `feature_name, cohort, total_users, converted_users, conversion_rate, avg_days_to_convert, avg_mrr`
-   - Cohorts: `used_feature`, `available_not_used`, `not_available`
-   - Overwrite mode with schema evolution
-   - Output: `data/gold/gold_feature_conversion_impact/`
-
-**Key Insight:**
-Compare conversion rates across cohorts to measure feature impact:
-```
-cohort                  | conversion_rate
------------------------------------------
-used_feature            | 37% (feature adopters)
-available_not_used      |  8% (non-adopters)
-→ 37% / 8% = 4.6x conversion lift
-```
-
-**Features:**
-- Cross-joins users with all current features for complete cohort coverage
-- Correctly handles non-converted users (counted in totals, excluded from averages)
-- Delta Lake overwrite mode ensures idempotent re-runs
-
-### Run Full Pipeline
-
-```bash
-make pipeline
-```
-
-This executes all three layers sequentially: bronze → silver → gold.
-
-## Orchestration with Airflow
-
-The pipeline uses **8 independent per-table DAGs** with **Airflow Datasets** for cross-DAG scheduling. Each DAG follows a 3-task pattern with data quality gates:
-
-```
-assert_input_quality -> process -> assert_output_quality
-```
-
-### DAG Architecture
-
-- **Bronze DAGs** (`@daily`): Produce Dataset events that trigger downstream DAGs
-- **Silver DAGs** (dataset-triggered): Run when upstream bronze Datasets are updated
-- **Gold DAG** (dataset-triggered): Runs when all upstream silver + bronze_conversions Datasets are updated
-
-### Cross-DAG Dependency Map
-
-```
-bronze_feature_releases ────────> silver_feature_states ──────┐
-bronze_user_signups ─────┐                                    │
-bronze_conversions ──────┼──────> silver_user_dim ────────────┼──> gold_feature_conversion_impact
-                         │                                    │
-bronze_feature_usage_events ──> silver_feature_usage_facts ──┘
-bronze_conversions ──────────────────────────────────────────┘
-```
-
-### DAGs
-
-| DAG ID | Layer | Schedule | Produces Dataset |
-|--------|-------|----------|-----------------|
-| `bronze_feature_releases` | Bronze | `@daily` | `delta://bronze/feature_releases` |
-| `bronze_user_signups` | Bronze | `@daily` | `delta://bronze/user_signups` |
-| `bronze_feature_usage_events` | Bronze | `@daily` | `delta://bronze/feature_usage_events` |
-| `bronze_conversions` | Bronze | `@daily` | `delta://bronze/conversions` |
-| `silver_feature_states` | Silver | Dataset-triggered | `delta://silver/feature_states` |
-| `silver_user_dim` | Silver | Dataset-triggered | `delta://silver/user_dim` |
-| `silver_feature_usage_facts` | Silver | Dataset-triggered | `delta://silver/feature_usage_facts` |
-| `gold_feature_conversion_impact` | Gold | Dataset-triggered | `delta://gold/feature_conversion_impact` |
-
-### Data Quality Validation
-
-Each DAG includes input and output validation gates:
-- **Input validation**: Verifies upstream data exists, has correct schema, and is non-empty
-- **Output validation**: Verifies the produced Delta table has the expected schema and row count
-
-The validation framework (`spark/jobs/data_quality/validators.py`) provides:
-- `validate_schema()` - StructType field name and type checking
-- `validate_delta_table()` - Delta table existence, schema, and row count
-- `validate_raw_file()` - Raw file readability, schema, and non-emptiness
-
-### Running Airflow
-
-```bash
-# Initialize Airflow database
-make airflow-init
-
-# Start Airflow services via Docker
-make docker-up
-
-# Run DAG tests
-make test-airflow
-```
-
-### Validation
-
-1. Trigger any bronze DAG manually in Airflow UI
-2. Observe downstream silver/gold DAGs trigger automatically via Datasets
-3. Verify all 3 tasks (input quality, process, output quality) turn green
-4. Check task logs for errors
+`chatbot/` is a small Claude agent with exactly two tools: `query_metric`
+(governed, validated) and `run_sql` (single-statement, read-only, guarded).
+Its grounding is generated from the contracts and metric catalog, and every
+query it executes is displayed next to the answer — auditable AI analytics
+rather than a black box (ADR 0007). Works as a Streamlit chat app and a
+terminal CLI; without an API key the app degrades to a data-catalog browser.
 
 ## Development
 
-### Run Tests
-
 ```bash
-# Run Spark job tests
-make test
-
-# Run Airflow DAG tests
-make test-airflow
-
-# Run all tests (Spark + Airflow)
-make test-all
+make test-all             # full suite (Spark + Airflow + semantic + chatbot)
+make lint                 # ruff
+make format               # black + ruff --fix
+make assert-typing        # mypy
+make pre-commit-install   # git hooks (black, ruff, mypy, hygiene)
+make docs                 # regenerate dictionary + lineage from contracts
+make help                 # everything else
 ```
 
-### Code Quality
+- **Tests mirror the source tree** — `tests/spark/jobs/silver/test_user_dim.py`
+  tests `spark/jobs/silver/user_dim/`; governance tests live in
+  `tests/semantic/`.
+- **CI** (GitHub Actions) runs lint, format check, mypy, and the full test
+  suite with Java + uv caching on every push/PR.
 
-The project includes code quality tools configured in `pyproject.toml`:
-
-```bash
-# Format code with black and ruff
-make format
-
-# Lint code with ruff
-make lint
-
-# Check type hints with mypy
-make assert-typing
-```
-
-#### Pre-commit Hooks
-
-Pre-commit hooks automatically run quality checks before each commit:
-
-```bash
-# Install hooks (one-time setup)
-make pre-commit-install
-
-# Run hooks manually on all files
-make pre-commit-run
-
-# Update hooks to latest versions
-make pre-commit-update
-```
-
-The hooks will automatically:
-- Format code with black
-- Lint and fix issues with ruff
-- Check type hints with mypy
-- Remove trailing whitespace
-- Fix end of files
-- Validate YAML, JSON, and TOML syntax
-- Check for large files and merge conflicts
-
-### Jupyter Notebooks
-
-```bash
-make notebook
-```
-
-Opens `notebooks/analysis_demo.ipynb` which demonstrates:
-- Loading gold-layer cohort metrics
-- Bar chart: conversion rates by feature and usage cohort
-- Key insight: real-time collaboration conversion lift
-- SCD Type 2 time-travel: querying historical vs current feature states
-
-## Delta Lake Tables
-
-### Querying Bronze Tables
-
-```python
-from pyspark.sql import SparkSession
-
-spark = SparkSession.builder \
-    .appName("Query Bronze") \
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-    .getOrCreate()
-
-# Read feature releases
-df = spark.read.format("delta").load("data/bronze/feature_releases")
-df.show()
-
-# Read with partition filtering (efficient!)
-df = spark.read.format("delta").load("data/bronze/user_signups") \
-    .filter("signup_date >= '2024-01-01'")
-df.show()
-```
-
-### Verifying Ingestion
-
-After running `make ingest-bronze`, verify tables:
-
-```bash
-# Check Delta table structure
-ls -R data/bronze/
-
-# Count records per table
-spark-submit --packages io.delta:delta-spark_2.12:3.0.0 \
-  --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension \
-  --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog \
-  -c "
-spark.read.format('delta').load('data/bronze/feature_releases').count()
-"
-```
-
-## Data Flow
+## Repository layout
 
 ```
-Raw Data (JSON/JSONL)
-    ↓
-[Bronze DAGs] ─ @daily, parallel ──→ produce Datasets
-    ↓ (Dataset triggers)
-[Silver DAGs] ─ auto-triggered ────→ produce Datasets
-    ↓ (Dataset triggers)
-[Gold DAG] ─ auto-triggered ───────→ final analytics
-
-Each DAG: assert_input_quality -> process -> assert_output_quality
+├── contracts/          # YAML data contracts — the governance source of truth
+├── spark/jobs/         # PySpark jobs: bronze/ silver/ gold/ + data_quality/
+├── airflow/dags/       # 14 per-table DAGs + shared config (Datasets)
+├── semantic/           # catalog, DuckDB engine, metric store + compiler, CLI
+├── chatbot/            # Claude analytics agent, Streamlit app, CLI
+├── scripts/            # data generator, docs generators
+├── tests/              # mirrors the source tree; incl. contract tests
+├── docs/               # ADRs + generated dictionary & lineage
+├── notebooks/          # analysis demo
+└── data/               # raw seeds (committed) + Delta lakehouse (generated)
 ```
 
-## Technology Stack
+## Architecture decision records
 
-- **Apache Spark 3.5+**: Distributed data processing
-- **Delta Lake 3.0+**: ACID transactions, time travel, schema evolution
-- **Apache Airflow 2.8+**: Workflow orchestration
-- **Python 3.12**: Core language
-- **Faker**: Synthetic data generation
-- **Pandas/NumPy**: Data manipulation
-- **Jupyter**: Interactive analysis
-- **UV**: Fast Python package manager
-
-## Makefile Commands
-
-```bash
-make help                 # Show all available commands
-make setup                # Create venv and install dependencies
-make generate-data        # Generate synthetic test data
-make format               # Format code with black and ruff
-make lint                 # Lint code with ruff
-make assert-typing        # Check type hints with mypy
-make pre-commit-install   # Install pre-commit hooks
-make pre-commit-run       # Run pre-commit hooks on all files
-make pre-commit-update    # Update pre-commit hooks
-make ingest-bronze        # Run bronze layer ingestion
-make ingest-silver        # Run silver layer transformation
-make ingest-gold          # Run gold layer aggregation
-make pipeline             # Run full pipeline (bronze → silver → gold)
-make test                 # Run Spark job unit tests
-make test-airflow         # Run Airflow DAG tests
-make test-all             # Run all tests (Spark + Airflow)
-make clean                # Remove cache and temp files
-make notebook             # Start Jupyter notebook server
-```
-
-## Contributing
-
-This is a learning/demonstration project. Feel free to:
-- Add more synthetic data scenarios
-- Implement additional analytics in the gold layer
-- Add more data quality validators
-- Improve error handling
-- Add more comprehensive tests
+| ADR | Decision |
+|---|---|
+| [0001](docs/adr/0001-medallion-architecture-on-delta-lake.md) | Medallion architecture on Delta Lake + Spark |
+| [0002](docs/adr/0002-per-table-jobs-with-validation-gates.md) | Per-table job modules with validation gates |
+| [0003](docs/adr/0003-airflow-datasets-for-cross-dag-scheduling.md) | One DAG per table, wired with Airflow Datasets |
+| [0004](docs/adr/0004-synthetic-data-with-engineered-signals.md) | Synthetic data with engineered causal signals |
+| [0005](docs/adr/0005-subscription-lifecycle-events-and-periodization.md) | Subscription lifecycle as events, periodized in silver |
+| [0006](docs/adr/0006-contracts-semantic-layer-duckdb.md) | Data contracts, YAML semantic layer, DuckDB serving |
+| [0007](docs/adr/0007-analytics-chatbot.md) | Analytics chatbot: Claude tool use over the semantic layer |
 
 ## License
 
-MIT License
-
-## Acknowledgments
-
-Built as a demonstration of modern data engineering practices with Delta Lake and Spark.
+MIT
