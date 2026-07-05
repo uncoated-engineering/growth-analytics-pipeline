@@ -1,101 +1,20 @@
 """
-Unit tests for gold_cohort_analysis.py
+Unit tests for the gold feature conversion impact aggregation.
 
 Tests cover:
 - Feature conversion impact cohort assignment logic
 - Conversion rate calculations
 - Avg days to convert and avg MRR aggregations
 - Edge cases: no conversions, no feature usage, single feature
-- Full gold aggregation orchestrator
 """
 
-import json
-import os
 
 from pyspark.sql.functions import col
 
-from spark.jobs.bronze.conversions.extract import ingest_conversions
-from spark.jobs.bronze.feature_releases.extract import ingest_feature_releases
-from spark.jobs.bronze.feature_usage_events.extract import ingest_feature_usage_events
-from spark.jobs.bronze.user_signups.extract import ingest_user_signups
 from spark.jobs.gold.feature_conversion_impact.aggregation import (
     calculate_feature_conversion_impact,
 )
-from spark.jobs.gold.main import run_gold_aggregation
-from spark.jobs.silver.feature_states.transformation import maintain_feature_states_scd
-from spark.jobs.silver.feature_usage_facts.transformation import create_feature_usage_facts
-from spark.jobs.silver.user_dim.transformation import maintain_user_dim
-
-# --- Helper functions to set up bronze + silver layers for gold tests ---
-
-
-def _setup_bronze_feature_releases(spark, temp_dir, releases, bronze_path=None):
-    """Helper: ingest feature releases into bronze Delta table."""
-    input_path = os.path.join(temp_dir, "feature_releases.json")
-    with open(input_path, "w") as f:
-        json.dump(releases, f)
-    if bronze_path is None:
-        bronze_path = os.path.join(temp_dir, "bronze")
-    output_path = os.path.join(bronze_path, "feature_releases")
-    ingest_feature_releases(spark, input_path, output_path)
-    return bronze_path
-
-
-def _setup_bronze_user_signups(spark, temp_dir, signups, bronze_path=None):
-    """Helper: ingest user signups into bronze Delta table."""
-    input_path = os.path.join(temp_dir, "user_signups.jsonl")
-    with open(input_path, "w") as f:
-        for record in signups:
-            f.write(json.dumps(record) + "\n")
-    if bronze_path is None:
-        bronze_path = os.path.join(temp_dir, "bronze")
-    output_path = os.path.join(bronze_path, "user_signups")
-    ingest_user_signups(spark, input_path, output_path)
-    return bronze_path
-
-
-def _setup_bronze_conversions(spark, temp_dir, conversions, bronze_path=None):
-    """Helper: ingest conversions into bronze Delta table."""
-    input_path = os.path.join(temp_dir, "conversions.jsonl")
-    with open(input_path, "w") as f:
-        for record in conversions:
-            f.write(json.dumps(record) + "\n")
-    if bronze_path is None:
-        bronze_path = os.path.join(temp_dir, "bronze")
-    output_path = os.path.join(bronze_path, "conversions")
-    ingest_conversions(spark, input_path, output_path)
-    return bronze_path
-
-
-def _setup_bronze_feature_usage_events(spark, temp_dir, events, bronze_path=None):
-    """Helper: ingest feature usage events into bronze Delta table."""
-    input_path = os.path.join(temp_dir, "feature_usage_events.jsonl")
-    with open(input_path, "w") as f:
-        for record in events:
-            f.write(json.dumps(record) + "\n")
-    if bronze_path is None:
-        bronze_path = os.path.join(temp_dir, "bronze")
-    output_path = os.path.join(bronze_path, "feature_usage_events")
-    ingest_feature_usage_events(spark, input_path, output_path)
-    return bronze_path
-
-
-def _setup_full_pipeline(spark, temp_dir, releases, signups, conversions, events):
-    """Helper: set up bronze + silver layers end-to-end, return paths."""
-    bronze_path = os.path.join(temp_dir, "bronze")
-    silver_path = os.path.join(temp_dir, "silver")
-    gold_path = os.path.join(temp_dir, "gold")
-
-    _setup_bronze_feature_releases(spark, temp_dir, releases, bronze_path)
-    _setup_bronze_user_signups(spark, temp_dir, signups, bronze_path)
-    _setup_bronze_conversions(spark, temp_dir, conversions, bronze_path)
-    _setup_bronze_feature_usage_events(spark, temp_dir, events, bronze_path)
-
-    maintain_feature_states_scd(spark, bronze_path, silver_path)
-    maintain_user_dim(spark, bronze_path, silver_path)
-    create_feature_usage_facts(spark, bronze_path, silver_path)
-
-    return bronze_path, silver_path, gold_path
+from tests.spark.helpers import setup_full_pipeline
 
 
 class TestCalculateFeatureConversionImpact:
@@ -155,7 +74,7 @@ class TestCalculateFeatureConversionImpact:
             },
         ]
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
 
@@ -214,7 +133,7 @@ class TestCalculateFeatureConversionImpact:
             },
         ]
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -275,7 +194,7 @@ class TestCalculateFeatureConversionImpact:
         ]
         events = []  # No feature usage → both users in 'available_not_used'
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -335,7 +254,7 @@ class TestCalculateFeatureConversionImpact:
         ]
         events = []  # No feature usage
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -391,7 +310,7 @@ class TestCalculateFeatureConversionImpact:
         ]
         events = []
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -446,7 +365,7 @@ class TestCalculateFeatureConversionImpact:
         ]
         events = []
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -496,7 +415,7 @@ class TestCalculateFeatureConversionImpact:
             },
         ]
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -633,7 +552,7 @@ class TestCalculateFeatureConversionImpact:
             },
         ]
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -688,7 +607,7 @@ class TestCalculateFeatureConversionImpact:
         ]
         events = []
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
 
@@ -741,7 +660,7 @@ class TestCalculateFeatureConversionImpact:
         ]
         events = []
 
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
+        bronze_path, silver_path, gold_path = setup_full_pipeline(
             spark, temp_dir, releases, signups, conversions, events
         )
         calculate_feature_conversion_impact(spark, bronze_path, silver_path, gold_path)
@@ -753,90 +672,3 @@ class TestCalculateFeatureConversionImpact:
 
         # avg_days_to_convert should be 10 (only the converted user counts)
         assert abs(row.avg_days_to_convert - 10.0) < 0.001
-
-
-class TestRunGoldAggregation:
-    """Test suite for run_gold_aggregation orchestrator function"""
-
-    def test_run_gold_aggregation_returns_stats(self, spark, temp_dir):
-        """Test that run_gold_aggregation returns correct statistics."""
-        releases = [
-            {"id": 1, "name": "feature_a", "release_date": "2024-01-01", "version": "v1.0"},
-        ]
-        signups = [
-            {
-                "user_id": 1,
-                "email": "u1@test.com",
-                "signup_date": "2024-01-10",
-                "company_size": "Small",
-                "industry": "Tech",
-            },
-        ]
-        conversions = [
-            {
-                "user_id": 1,
-                "conversion_date": "2024-02-01",
-                "plan": "Pro",
-                "mrr": 99,
-                "signup_date": "2024-01-10",
-                "days_to_convert": 22,
-                "used_real_time_collab": False,
-            },
-        ]
-        events = [
-            {
-                "timestamp": "2024-01-15 10:00:00",
-                "user_id": 1,
-                "feature_id": 1,
-                "feature_name": "feature_a",
-                "event_type": "click",
-            },
-        ]
-
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
-            spark, temp_dir, releases, signups, conversions, events
-        )
-
-        stats = run_gold_aggregation(spark, bronze_path, silver_path, gold_path)
-
-        assert isinstance(stats, dict)
-        assert "feature_conversion_impact" in stats
-        assert stats["feature_conversion_impact"] > 0
-
-    def test_run_gold_aggregation_creates_table(self, spark, temp_dir):
-        """Test that run_gold_aggregation creates the gold Delta table."""
-        releases = [
-            {"id": 1, "name": "feature_a", "release_date": "2024-01-01", "version": "v1.0"},
-        ]
-        signups = [
-            {
-                "user_id": 1,
-                "email": "u1@test.com",
-                "signup_date": "2024-01-10",
-                "company_size": "Small",
-                "industry": "Tech",
-            },
-        ]
-        conversions = [
-            {
-                "user_id": 1,
-                "conversion_date": "2024-02-01",
-                "plan": "Pro",
-                "mrr": 99,
-                "signup_date": "2024-01-10",
-                "days_to_convert": 22,
-                "used_real_time_collab": False,
-            },
-        ]
-        events = []
-
-        bronze_path, silver_path, gold_path = _setup_full_pipeline(
-            spark, temp_dir, releases, signups, conversions, events
-        )
-
-        run_gold_aggregation(spark, bronze_path, silver_path, gold_path)
-
-        table_path = os.path.join(gold_path, "gold_feature_conversion_impact")
-        assert os.path.exists(table_path)
-        df = spark.read.format("delta").load(table_path)
-        assert df.count() > 0
