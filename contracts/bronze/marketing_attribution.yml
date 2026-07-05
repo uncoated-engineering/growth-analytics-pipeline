@@ -1,0 +1,29 @@
+table: marketing_attribution
+layer: bronze
+path: data/bronze/marketing_attribution
+grain: One row per attributed signup (first touch)
+description: >
+  First-touch marketing attribution ingested from marketing_attribution.jsonl.
+  Roughly 5% of signups have no record (direct traffic, lost UTM parameters);
+  downstream joins default those users to 'unattributed'.
+owner: data-engineering
+source: data/raw/marketing_attribution.jsonl (JSONL)
+upstreams: []
+columns:
+  - name: user_id
+    type: integer
+    description: Attributed user
+  - name: channel
+    type: string
+    description: >-
+      Acquisition channel: organic_search, paid_search, paid_social,
+      content_marketing, referral, partner, outbound
+  - name: campaign
+    type: string
+    description: Campaign within the channel (e.g. google_brand, webinar_series)
+  - name: first_touch_date
+    type: string
+    description: Date of the first tracked touch, YYYY-MM-DD (on or before signup)
+  - name: ingestion_timestamp
+    type: timestamp
+    description: When the row was loaded into bronze

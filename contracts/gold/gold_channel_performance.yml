@@ -1,0 +1,35 @@
+table: gold_channel_performance
+layer: gold
+path: data/gold/gold_channel_performance
+grain: One row per signup month per acquisition channel
+description: >
+  Acquisition funnel quality per channel per signup cohort - which channels
+  bring users who actually convert, how fast, and at what revenue. Includes
+  the 'unattributed' bucket so totals reconcile with overall signups.
+owner: analytics-engineering
+upstreams: [silver_user_dim, conversions]
+columns:
+  - name: signup_month
+    type: date
+    description: First day of the signup month (cohort)
+  - name: acquisition_channel
+    type: string
+    description: First-touch channel, or 'unattributed'
+  - name: signups
+    type: long
+    description: Users who signed up in the cohort
+  - name: conversions
+    type: long
+    description: Of those, users who later converted to paid
+  - name: conversion_rate
+    type: double
+    description: conversions / signups
+  - name: avg_days_to_convert
+    type: double
+    description: Average signup-to-conversion days (converted users only)
+  - name: total_new_mrr
+    type: long
+    description: Total MRR (USD) acquired from this cohort at conversion
+  - name: avg_new_mrr
+    type: double
+    description: Average MRR per conversion

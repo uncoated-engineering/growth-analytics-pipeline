@@ -1,0 +1,34 @@
+table: silver_subscription_periods
+layer: silver
+path: data/silver/silver_subscription_periods
+grain: One row per subscription state validity interval
+description: >
+  Periodized subscription lifecycle - each row is a (plan, mrr) state valid
+  from period_start until the next event at period_end. Cancellations close
+  the previous period without opening a new one, so churned customers have
+  no active period. Point-in-time revenue questions use
+  WHERE date >= period_start AND date < period_end.
+owner: data-engineering
+upstreams: [subscription_events]
+columns:
+  - name: user_id
+    type: integer
+    description: Customer
+  - name: plan
+    type: string
+    description: Plan in force during the period (pro or enterprise)
+  - name: mrr
+    type: integer
+    description: MRR (USD) in force during the period
+  - name: period_start
+    type: date
+    description: Date the state took effect
+  - name: period_end
+    type: date
+    description: Date the next event superseded it; 9999-12-31 if none
+  - name: is_active
+    type: boolean
+    description: True for the customer's current, non-cancelled state
+  - name: change_type
+    type: string
+    description: Subscription event type that opened the period

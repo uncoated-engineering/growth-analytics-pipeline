@@ -1,0 +1,47 @@
+table: gold_mrr_waterfall
+layer: gold
+path: data/gold/gold_mrr_waterfall
+grain: One row per calendar month
+description: >
+  Monthly MRR waterfall decomposing revenue growth into new business,
+  expansion, contraction, and churn, with net revenue retention. Internally
+  consistent by construction - ending_mrr = starting_mrr + net_new_mrr
+  every month.
+owner: analytics-engineering
+upstreams: [subscription_events]
+columns:
+  - name: month
+    type: date
+    description: First day of the month
+  - name: starting_mrr
+    type: long
+    description: MRR at the start of the month (previous month's ending)
+  - name: new_business_mrr
+    type: long
+    description: MRR from subscriptions started this month
+  - name: expansion_mrr
+    type: long
+    description: MRR gained from upgrades and seat expansion
+  - name: contraction_mrr
+    type: long
+    description: MRR lost to downgrades and seat contraction
+  - name: churned_mrr
+    type: long
+    description: MRR lost to cancellations
+  - name: net_new_mrr
+    type: long
+    description: new_business + expansion - contraction - churned
+  - name: ending_mrr
+    type: long
+    description: MRR at the end of the month
+  - name: new_customers
+    type: long
+    description: Subscriptions started this month
+  - name: churned_customers
+    type: long
+    description: Subscriptions cancelled this month
+  - name: net_revenue_retention
+    type: double
+    description: >-
+      (starting + expansion - contraction - churned) / starting. Excludes
+      new business (standard SaaS NRR). NULL for the first month.

@@ -1,0 +1,27 @@
+table: feature_releases
+layer: bronze
+path: data/bronze/feature_releases
+grain: One row per feature release or version upgrade
+description: >
+  Raw product feature release log ingested from feature_releases.json.
+  Contains initial releases and later version upgrades of the same feature,
+  which feed the SCD Type 2 feature_states dimension.
+owner: data-engineering
+source: data/raw/feature_releases.json (JSON array)
+upstreams: []
+columns:
+  - name: feature_id
+    type: integer
+    description: Stable feature identifier (shared across version upgrades)
+  - name: feature_name
+    type: string
+    description: Machine name of the feature (e.g. real_time_collab)
+  - name: release_date
+    type: string
+    description: Release date of this version, YYYY-MM-DD
+  - name: version
+    type: string
+    description: Version label (v1.0, v2.0, ...)
+  - name: ingestion_timestamp
+    type: timestamp
+    description: When the row was loaded into bronze

@@ -1,0 +1,32 @@
+table: gold_weekly_engagement
+layer: gold
+path: data/gold/gold_weekly_engagement
+grain: One row per ISO week per feature
+description: >
+  Weekly engagement metrics per feature - weekly active users, event volume,
+  intensity, and each feature's reach as a share of the overall weekly
+  active base (pct_of_wau).
+owner: analytics-engineering
+upstreams: [feature_usage_events]
+columns:
+  - name: week_start
+    type: date
+    description: Monday of the ISO week
+  - name: feature_name
+    type: string
+    description: Feature machine name
+  - name: active_users
+    type: long
+    description: Distinct users of this feature during the week
+  - name: total_events
+    type: long
+    description: Usage events for this feature during the week
+  - name: events_per_active_user
+    type: double
+    description: total_events / active_users (engagement intensity)
+  - name: weekly_active_users
+    type: long
+    description: Distinct users across ALL features that week (overall WAU)
+  - name: pct_of_wau
+    type: double
+    description: active_users / weekly_active_users (feature reach)

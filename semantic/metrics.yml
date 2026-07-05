@@ -1,0 +1,231 @@
+# Governed metric definitions - the semantic layer.
+#
+# Every metric is a SQL aggregate expression over ONE lakehouse table, so it
+# re-aggregates correctly at any requested dimensional grain (ratio metrics
+# are defined as ratios of sums, never averages of averages).
+#
+# Fields:
+#   label / description : business-facing documentation
+#   table               : lakehouse table the metric is computed from
+#   expression          : DuckDB SQL aggregate expression
+#   dimensions          : columns the metric may be grouped/filtered by
+#   time_dimension      : preferred time column (also listed in dimensions)
+#   format              : number | currency | percent
+
+metrics:
+  # ── Revenue (gold_mrr_waterfall) ─────────────────────────────────────────
+  - name: ending_mrr
+    label: Ending MRR
+    description: >-
+      Monthly recurring revenue at the end of the period. Unsliced, returns
+      the latest month's value; grouped by month, returns each month's value.
+    table: gold_mrr_waterfall
+    expression: arg_max(ending_mrr, month)
+    dimensions: [month]
+    time_dimension: month
+    format: currency
+
+  - name: new_business_mrr
+    label: New business MRR
+    description: MRR added by subscriptions started in the period.
+    table: gold_mrr_waterfall
+    expression: SUM(new_business_mrr)
+    dimensions: [month]
+    time_dimension: month
+    format: currency
+
+  - name: expansion_mrr
+    label: Expansion MRR
+    description: MRR gained from plan upgrades and seat expansion.
+    table: gold_mrr_waterfall
+    expression: SUM(expansion_mrr)
+    dimensions: [month]
+    time_dimension: month
+    format: currency
+
+  - name: contraction_mrr
+    label: Contraction MRR
+    description: MRR lost to plan downgrades and seat contraction.
+    table: gold_mrr_waterfall
+    expression: SUM(contraction_mrr)
+    dimensions: [month]
+    time_dimension: month
+    format: currency
+
+  - name: churned_mrr
+    label: Churned MRR
+    description: MRR lost to subscription cancellations.
+    table: gold_mrr_waterfall
+    expression: SUM(churned_mrr)
+    dimensions: [month]
+    time_dimension: month
+    format: currency
+
+  - name: net_new_mrr
+    label: Net new MRR
+    description: New business + expansion - contraction - churned MRR.
+    table: gold_mrr_waterfall
+    expression: SUM(net_new_mrr)
+    dimensions: [month]
+    time_dimension: month
+    format: currency
+
+  - name: net_revenue_retention
+    label: Net revenue retention
+    description: >-
+      (starting + expansion - contraction - churned) / starting MRR.
+      Excludes new business. Across multiple months this is the
+      starting-MRR-weighted average of monthly NRR.
+    table: gold_mrr_waterfall
+    expression: >-
+      SUM(starting_mrr + expansion_mrr - contraction_mrr - churned_mrr)
+      * 1.0 / NULLIF(SUM(starting_mrr), 0)
+    dimensions: [month]
+    time_dimension: month
+    format: percent
+
+  - name: new_customers
+    label: New customers
+    description: Subscriptions started in the period.
+    table: gold_mrr_waterfall
+    expression: SUM(new_customers)
+    dimensions: [month]
+    time_dimension: month
+    format: number
+
+  - name: churned_customers
+    label: Churned customers
+    description: Subscriptions cancelled in the period.
+    table: gold_mrr_waterfall
+    expression: SUM(churned_customers)
+    dimensions: [month]
+    time_dimension: month
+    format: number
+
+  # ── Customer base (silver_user_dim) ──────────────────────────────────────
+  - name: total_users
+    label: Total users
+    description: All signed-up users, whatever their current plan.
+    table: silver_user_dim
+    expression: COUNT(*)
+    dimensions:
+      [acquisition_channel, acquisition_campaign, industry, company_size, current_plan]
+    format: number
+
+  - name: paying_customers
+    label: Paying customers
+    description: Users whose current plan is pro or enterprise.
+    table: silver_user_dim
+    expression: COUNT(*) FILTER (WHERE current_plan IN ('pro', 'enterprise'))
+    dimensions: [acquisition_channel, industry, company_size]
+    format: number
+
+  - name: churned_users
+    label: Churned users
+    description: Users who converted at some point and later cancelled.
+    table: silver_user_dim
+    expression: COUNT(*) FILTER (WHERE current_plan = 'churned')
+    dimensions: [acquisition_channel, industry, company_size]
+    format: number
+
+  - name: current_mrr
+    label: Current MRR (customer base)
+    description: >-
+      Sum of MRR across currently active subscriptions, sliceable by any
+      user attribute (channel, industry, size, plan).
+    table: silver_user_dim
+    expression: SUM(current_mrr)
+    dimensions:
+      [acquisition_channel, acquisition_campaign, industry, company_size, current_plan]
+    format: currency
+
+  - name: arpu
+    label: ARPU (paying)
+    description: Average revenue per paying customer.
+    table: silver_user_dim
+    expression: >-
+      SUM(current_mrr) * 1.0
+      / NULLIF(COUNT(*) FILTER (WHERE current_plan IN ('pro', 'enterprise')), 0)
+    dimensions: [acquisition_channel, industry, company_size]
+    format: currency
+
+  # ── Acquisition funnel (gold_channel_performance) ────────────────────────
+  - name: signups
+    label: Signups
+    description: New user registrations.
+    table: gold_channel_performance
+    expression: SUM(signups)
+    dimensions: [signup_month, acquisition_channel]
+    time_dimension: signup_month
+    format: number
+
+  - name: conversions
+    label: Conversions
+    description: Signups that later converted to a paid plan.
+    table: gold_channel_performance
+    expression: SUM(conversions)
+    dimensions: [signup_month, acquisition_channel]
+    time_dimension: signup_month
+    format: number
+
+  - name: conversion_rate
+    label: Conversion rate
+    description: >-
+      Conversions / signups, correctly re-aggregated as a ratio of sums at
+      any grain.
+    table: gold_channel_performance
+    expression: SUM(conversions) * 1.0 / NULLIF(SUM(signups), 0)
+    dimensions: [signup_month, acquisition_channel]
+    time_dimension: signup_month
+    format: percent
+
+  - name: acquired_mrr
+    label: Acquired MRR
+    description: MRR captured at conversion, attributed to the signup cohort.
+    table: gold_channel_performance
+    expression: SUM(total_new_mrr)
+    dimensions: [signup_month, acquisition_channel]
+    time_dimension: signup_month
+    format: currency
+
+  # ── Engagement (gold_weekly_engagement) ──────────────────────────────────
+  - name: feature_active_users
+    label: Feature active users
+    description: >-
+      Distinct weekly users per feature. Summed across weeks this counts
+      user-weeks of usage, not distinct users.
+    table: gold_weekly_engagement
+    expression: SUM(active_users)
+    dimensions: [week_start, feature_name]
+    time_dimension: week_start
+    format: number
+
+  - name: weekly_active_users
+    label: Weekly active users (overall)
+    description: Distinct users active across any feature in the week.
+    table: gold_weekly_engagement
+    expression: MAX(weekly_active_users)
+    dimensions: [week_start]
+    time_dimension: week_start
+    format: number
+
+  - name: feature_events
+    label: Feature events
+    description: Raw usage event volume.
+    table: gold_weekly_engagement
+    expression: SUM(total_events)
+    dimensions: [week_start, feature_name]
+    time_dimension: week_start
+    format: number
+
+  # ── Feature impact (gold_feature_conversion_impact) ──────────────────────
+  - name: feature_conversion_rate
+    label: Feature cohort conversion rate
+    description: >-
+      Conversion rate of users in a feature cohort (used_feature vs
+      available_not_used vs not_available). The used/available ratio is the
+      feature's conversion lift.
+    table: gold_feature_conversion_impact
+    expression: SUM(converted_users) * 1.0 / NULLIF(SUM(total_users), 0)
+    dimensions: [feature_name, cohort]
+    format: percent

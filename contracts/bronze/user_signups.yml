@@ -1,0 +1,31 @@
+table: user_signups
+layer: bronze
+path: data/bronze/user_signups
+grain: One row per user signup
+description: >
+  Raw user registrations ingested from user_signups.jsonl, partitioned by
+  signup_date. Firmographic attributes (company size, industry) come from
+  the signup form.
+owner: data-engineering
+source: data/raw/user_signups.jsonl (JSONL)
+partitioned_by: [signup_date]
+upstreams: []
+columns:
+  - name: user_id
+    type: integer
+    description: Unique user identifier
+  - name: email
+    type: string
+    description: Signup email (synthetic; excluded from silver for privacy)
+  - name: signup_date
+    type: string
+    description: Signup date, YYYY-MM-DD (partition column)
+  - name: company_size
+    type: string
+    description: "Company size bucket: 1-10, 11-50, 51-200, 201-1000, 1000+"
+  - name: industry
+    type: string
+    description: "Industry: technology, finance, healthcare, retail, education, manufacturing"
+  - name: ingestion_timestamp
+    type: timestamp
+    description: When the row was loaded into bronze

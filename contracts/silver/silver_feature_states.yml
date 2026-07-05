@@ -1,0 +1,36 @@
+table: silver_feature_states
+layer: silver
+path: data/silver/silver_feature_states
+grain: One row per feature per version validity interval (SCD Type 2)
+description: >
+  Slowly Changing Dimension (Type 2) tracking feature version history.
+  Version upgrades close the previous record (effective_to) and open a new
+  current one. Point-in-time state is answered with
+  WHERE date >= effective_from AND date < effective_to.
+owner: data-engineering
+upstreams: [feature_releases]
+columns:
+  - name: feature_id
+    type: integer
+    description: Stable feature identifier
+  - name: feature_name
+    type: string
+    description: Feature machine name
+  - name: version
+    type: string
+    description: Version label in force during the interval
+  - name: is_enabled
+    type: boolean
+    description: Whether the feature was enabled (always true in current data)
+  - name: effective_from
+    type: date
+    description: Start of the validity interval (release date)
+  - name: effective_to
+    type: date
+    description: End of the validity interval; 9999-12-31 for current records
+  - name: is_current
+    type: boolean
+    description: True for the record currently in force
+  - name: record_hash
+    type: string
+    description: md5(feature_name|version) used for change detection

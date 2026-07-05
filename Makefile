@@ -1,4 +1,4 @@
-.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test test-airflow test-all generate-data airflow-standalone notebook ingest-bronze ingest-silver ingest-gold pipeline
+.PHONY: help install install-dev setup sync clean format lint assert-typing pre-commit-install pre-commit-run pre-commit-update test test-airflow test-all generate-data airflow-standalone notebook ingest-bronze ingest-silver ingest-gold pipeline docs semantic-cli
 
 PROJECT_DIR := $(shell pwd)
 DAGS_DIR := $(PROJECT_DIR)/airflow/dags
@@ -20,6 +20,7 @@ help:
 	@echo "  make test-airflow         - Run Airflow DAG tests"
 	@echo "  make test-all             - Run all tests (Spark + Airflow)"
 	@echo "  make generate-data        - Generate synthetic data"
+	@echo "  make docs                 - Regenerate data dictionary and lineage docs"
 	@echo "  make ingest-bronze        - Run bronze layer ingestion (raw to Delta)"
 	@echo "  make ingest-silver        - Run silver layer transformation (SCD Type 2)"
 	@echo "  make ingest-gold          - Run gold layer aggregation (cohort analysis)"
@@ -59,19 +60,19 @@ clean:
 
 format:
 	@echo "Formatting code with black..."
-	uv run black spark/ scripts/ airflow/
+	uv run black spark/ scripts/ airflow/ semantic/ tests/
 	@echo "Formatting code with ruff..."
-	uv run ruff check --fix spark/ scripts/ airflow/
+	uv run ruff check --fix spark/ scripts/ airflow/ semantic/ tests/
 	@echo "Formatting complete!"
 
 lint:
 	@echo "Linting code with ruff..."
-	uv run ruff check spark/ scripts/ airflow/
+	uv run ruff check spark/ scripts/ airflow/ semantic/ tests/
 	@echo "Linting complete!"
 
 assert-typing:
 	@echo "Checking type hints with mypy..."
-	uv run mypy spark/ scripts/ airflow/
+	uv run mypy spark/ scripts/ airflow/ semantic/
 	@echo "Type checking complete!"
 
 pre-commit-install:
@@ -111,6 +112,11 @@ airflow-standalone:
 notebook:
 	@echo "Starting Jupyter notebook server..."
 	uv run jupyter notebook notebooks/
+
+docs:
+	@echo "Regenerating data dictionary and lineage docs from contracts/..."
+	uv run python scripts/generate_data_dictionary.py
+	uv run python scripts/generate_lineage.py
 
 ingest-bronze:
 	@echo "Running bronze layer ingestion..."

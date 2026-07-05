@@ -1,0 +1,42 @@
+table: subscription_events
+layer: bronze
+path: data/bronze/subscription_events
+grain: One row per subscription lifecycle event
+description: >
+  Append-only subscription lifecycle log ingested from
+  subscription_events.jsonl — the shape billing systems (Stripe, Chargebee)
+  emit. Every plan or seat change carries the MRR before and after, which
+  makes revenue movement analysis a simple delta.
+owner: data-engineering
+source: data/raw/subscription_events.jsonl (JSONL)
+upstreams: []
+columns:
+  - name: event_id
+    type: integer
+    description: Unique event identifier (monotonic per generation run)
+  - name: user_id
+    type: integer
+    description: Customer the event belongs to
+  - name: event_date
+    type: string
+    description: Event date, YYYY-MM-DD
+  - name: event_type
+    type: string
+    description: >-
+      subscription_started, plan_upgraded, plan_downgraded, seats_expanded,
+      seats_contracted, or subscription_cancelled
+  - name: plan
+    type: string
+    description: Plan after the event (null for cancellations)
+  - name: mrr
+    type: integer
+    description: MRR (USD) after the event; 0 for cancellations
+  - name: previous_plan
+    type: string
+    description: Plan before the event (null for subscription_started)
+  - name: previous_mrr
+    type: integer
+    description: MRR (USD) before the event (null for subscription_started)
+  - name: ingestion_timestamp
+    type: timestamp
+    description: When the row was loaded into bronze

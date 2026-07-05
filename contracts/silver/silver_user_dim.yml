@@ -1,0 +1,38 @@
+table: silver_user_dim
+layer: silver
+path: data/silver/silver_user_dim
+grain: One row per user
+description: >
+  The user dimension. Combines signup firmographics, first-touch marketing
+  attribution, and the current commercial state derived from the latest
+  subscription lifecycle event. This is the main join target for
+  user-level analysis.
+owner: data-engineering
+upstreams: [user_signups, marketing_attribution, subscription_events]
+columns:
+  - name: user_id
+    type: integer
+    description: Unique user identifier
+  - name: signup_date
+    type: date
+    description: Signup date
+  - name: company_size
+    type: string
+    description: "Company size bucket: 1-10, 11-50, 51-200, 201-1000, 1000+"
+  - name: industry
+    type: string
+    description: Industry vertical
+  - name: acquisition_channel
+    type: string
+    description: First-touch channel; 'unattributed' when no tracking record exists
+  - name: acquisition_campaign
+    type: string
+    description: First-touch campaign; 'unattributed' when no tracking record exists
+  - name: current_plan
+    type: string
+    description: >-
+      free (never converted), pro, enterprise, or churned (subscription
+      cancelled)
+  - name: current_mrr
+    type: integer
+    description: MRR (USD) of the active subscription; 0 for free/churned users

@@ -1,0 +1,36 @@
+table: conversions
+layer: bronze
+path: data/bronze/conversions
+grain: One row per free-to-paid conversion
+description: >
+  Raw conversion records ingested from conversions.jsonl. A conversion is
+  the moment a free user becomes a paying customer; the ongoing subscription
+  lifecycle after this moment lives in subscription_events.
+owner: data-engineering
+source: data/raw/conversions.jsonl (JSONL)
+upstreams: []
+columns:
+  - name: user_id
+    type: integer
+    description: User who converted
+  - name: conversion_date
+    type: string
+    description: Conversion date, YYYY-MM-DD
+  - name: plan
+    type: string
+    description: "Plan purchased at conversion: pro or enterprise"
+  - name: mrr
+    type: integer
+    description: Monthly recurring revenue (USD) at conversion
+  - name: signup_date
+    type: string
+    description: Denormalized signup date for convenience
+  - name: days_to_convert
+    type: integer
+    description: Days between signup and conversion
+  - name: used_real_time_collab
+    type: boolean
+    description: Legacy flag from the source system (superseded by usage facts)
+  - name: ingestion_timestamp
+    type: timestamp
+    description: When the row was loaded into bronze

@@ -1,0 +1,37 @@
+table: feature_usage_events
+layer: bronze
+path: data/bronze/feature_usage_events
+grain: One row per feature interaction event
+description: >
+  Raw product telemetry ingested from feature_usage_events.jsonl, partitioned
+  by event_date. Each row is a single user interaction (view/use/share) with
+  a feature.
+owner: data-engineering
+source: data/raw/feature_usage_events.jsonl (JSONL)
+partitioned_by: [event_date]
+upstreams: []
+columns:
+  - name: event_id
+    type: long
+    description: Surrogate event identifier generated at ingestion
+  - name: user_id
+    type: integer
+    description: User who performed the interaction
+  - name: feature_id
+    type: integer
+    description: Feature interacted with
+  - name: feature_name
+    type: string
+    description: Denormalized feature machine name
+  - name: event_type
+    type: string
+    description: "Interaction type: view, use, or share"
+  - name: event_timestamp
+    type: timestamp
+    description: When the interaction happened
+  - name: event_date
+    type: date
+    description: Calendar date of the interaction (partition column)
+  - name: ingestion_timestamp
+    type: timestamp
+    description: When the row was loaded into bronze

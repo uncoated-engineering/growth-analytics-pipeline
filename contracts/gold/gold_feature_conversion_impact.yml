@@ -1,0 +1,38 @@
+table: gold_feature_conversion_impact
+layer: gold
+path: data/gold/gold_feature_conversion_impact
+grain: One row per feature per cohort
+description: >
+  Cohort analysis answering "does feature adoption drive conversion?".
+  For every feature, users are split into used_feature /
+  available_not_used / not_available cohorts and conversion outcomes are
+  compared across them. The ratio of conversion rates between the first
+  two cohorts is the feature's conversion lift.
+owner: analytics-engineering
+upstreams:
+  - silver_user_dim
+  - silver_feature_states
+  - silver_feature_usage_facts
+  - conversions
+columns:
+  - name: feature_name
+    type: string
+    description: Feature machine name
+  - name: cohort
+    type: string
+    description: "used_feature, available_not_used, or not_available"
+  - name: total_users
+    type: long
+    description: Users in the cohort
+  - name: converted_users
+    type: long
+    description: Users in the cohort who converted to paid
+  - name: conversion_rate
+    type: double
+    description: converted_users / total_users
+  - name: avg_days_to_convert
+    type: double
+    description: Average signup-to-conversion days (converted users only)
+  - name: avg_mrr
+    type: double
+    description: Average MRR at conversion (converted users only)

@@ -1,0 +1,31 @@
+table: silver_feature_usage_facts
+layer: silver
+path: data/silver/silver_feature_usage_facts
+grain: One row per user per feature ever used
+description: >
+  Per-user, per-feature usage summary aggregated from raw telemetry.
+  first_used_date is the key column for adoption-before-conversion analysis.
+owner: data-engineering
+upstreams: [feature_usage_events]
+columns:
+  - name: user_id
+    type: integer
+    description: User
+  - name: feature_id
+    type: integer
+    description: Feature
+  - name: first_used_date
+    type: date
+    description: First interaction date (adoption moment)
+  - name: last_used_date
+    type: date
+    description: Most recent interaction date
+  - name: total_usage_count
+    type: long
+    description: Total interaction events
+  - name: avg_daily_usage
+    type: double
+    description: total_usage_count / days between first and last use (inclusive)
+  - name: as_of_date
+    type: date
+    description: Snapshot date the fact table was built
