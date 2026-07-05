@@ -5,7 +5,7 @@ description = "SaaS PLG Growth Analytics Pipeline with Delta Lake and Airflow"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
-    { name = "Your Name", email = "your.email@example.com" }
+    { name = "Cedric", email = "cedric.en@helloasso.org" }
 ]
 
 dependencies = [

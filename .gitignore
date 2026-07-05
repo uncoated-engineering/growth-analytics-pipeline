@@ -10,6 +10,13 @@ documentation/*
 .vscode/
 .claude/
 
+# dbt (experiments live on separate branches; artifacts never belong in git)
+dbt_packages/
+logs/
+.user.yml
+*.duckdb
+*.duckdb.wal
+
 # C extensions
 *.so
 
