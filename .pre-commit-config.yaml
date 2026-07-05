@@ -12,7 +12,7 @@ repos:
         language: system
         types: [python]
         args: [--line-length=100]
-        files: ^(spark|scripts|airflow|tests|semantic)/.*\.py$
+        files: ^(spark|scripts|airflow|tests|semantic|chatbot)/.*\.py$
 
   # Ruff - Fast Python linter (using local/system version)
   - repo: local
@@ -23,14 +23,14 @@ repos:
         language: system
         types: [python]
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^(spark|scripts|airflow|tests|semantic)/.*\.py$
+        files: ^(spark|scripts|airflow|tests|semantic|chatbot)/.*\.py$
 
   # Mypy - Static type checker (using local/system version)
   - repo: local
     hooks:
       - id: mypy
         name: Check type hints with mypy
-        entry: bash -c 'uv run mypy spark/ scripts/ semantic/'
+        entry: bash -c 'uv run mypy spark/ scripts/ semantic/ chatbot/'
         language: system
         types: [python]
         files: ^(spark|scripts)/.*\.py$

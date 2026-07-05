@@ -25,7 +25,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-extras
 
       - name: Ruff (lint)
         run: uv run ruff check spark/ scripts/ airflow/ tests/
@@ -54,7 +54,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-extras
 
       - name: Run tests
         run: uv run pytest tests/ -v --cov=spark --cov-report=term-missing
