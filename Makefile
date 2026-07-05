@@ -89,16 +89,16 @@ pre-commit-update:
 	@echo "Pre-commit hooks updated!"
 
 test:
-	@echo "Running tests..."
-	uv run pytest spark/tests/ -v
+	@echo "Running Spark job tests..."
+	uv run pytest tests/spark -v
 
 test-airflow:
 	@echo "Running Airflow DAG tests..."
-	uv run pytest airflow/tests/ -v
+	uv run pytest tests/airflow -v
 
 test-all:
 	@echo "Running all tests (Spark + Airflow)..."
-	uv run pytest spark/tests/ airflow/tests/ -v
+	uv run pytest tests/ -v
 
 generate-data:
 	@echo "Generating synthetic data..."

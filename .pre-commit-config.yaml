@@ -12,7 +12,7 @@ repos:
         language: system
         types: [python]
         args: [--line-length=100]
-        files: ^(spark|scripts)/.*\.py$
+        files: ^(spark|scripts|airflow|tests)/.*\.py$
 
   # Ruff - Fast Python linter (using local/system version)
   - repo: local
@@ -23,7 +23,7 @@ repos:
         language: system
         types: [python]
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^(spark|scripts)/.*\.py$
+        files: ^(spark|scripts|airflow|tests)/.*\.py$
 
   # Mypy - Static type checker (using local/system version)
   - repo: local
