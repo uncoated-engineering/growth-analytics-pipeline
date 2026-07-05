@@ -1,20 +1,16 @@
 """
-Silver DAG: user_dim
+Bronze DAG: subscription_events
 
-Schedule: Triggered when bronze_user_signups, bronze_marketing_attribution,
-and bronze_subscription_events datasets are updated
-Produces: DATASET_SILVER_USER_DIM
+Schedule: @daily
+Produces: DATASET_BRONZE_SUBSCRIPTION_EVENTS
 """
 
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from config import (
-    DATASET_BRONZE_MARKETING_ATTRIBUTION,
+    BRONZE_SUBSCRIPTION_EVENTS_APP,
+    BRONZE_SUBSCRIPTION_EVENTS_VALIDATE,
     DATASET_BRONZE_SUBSCRIPTION_EVENTS,
-    DATASET_BRONZE_USER_SIGNUPS,
-    DATASET_SILVER_USER_DIM,
     DEFAULT_ARGS,
-    SILVER_USER_DIM_APP,
-    SILVER_USER_DIM_VALIDATE,
     SPARK_CONF,
     SPARK_CONN_ID,
     SPARK_ENV_VARS,
@@ -24,20 +20,16 @@ from config import (
 from airflow import DAG
 
 with DAG(
-    "silver_user_dim",
+    "bronze_subscription_events",
     default_args=DEFAULT_ARGS,
-    description="User dimension from signups, attribution, and subscription state",
-    schedule=[
-        DATASET_BRONZE_USER_SIGNUPS,
-        DATASET_BRONZE_MARKETING_ATTRIBUTION,
-        DATASET_BRONZE_SUBSCRIPTION_EVENTS,
-    ],
+    description="Ingest subscription_events raw JSONL into bronze Delta table",
+    schedule="@daily",
     catchup=False,
 ) as dag:
     assert_input_quality = SparkSubmitOperator(
         task_id="assert_input_quality",
         conn_id=SPARK_CONN_ID,
-        application=SILVER_USER_DIM_VALIDATE,
+        application=BRONZE_SUBSCRIPTION_EVENTS_VALIDATE,
         application_args=["--mode", "input"],
         packages=SPARK_PACKAGES,
         conf=SPARK_CONF,
@@ -47,17 +39,17 @@ with DAG(
     process = SparkSubmitOperator(
         task_id="process",
         conn_id=SPARK_CONN_ID,
-        application=SILVER_USER_DIM_APP,
+        application=BRONZE_SUBSCRIPTION_EVENTS_APP,
         packages=SPARK_PACKAGES,
         conf=SPARK_CONF,
         env_vars=SPARK_ENV_VARS,
-        outlets=[DATASET_SILVER_USER_DIM],
+        outlets=[DATASET_BRONZE_SUBSCRIPTION_EVENTS],
     )
 
     assert_output_quality = SparkSubmitOperator(
         task_id="assert_output_quality",
         conn_id=SPARK_CONN_ID,
-        application=SILVER_USER_DIM_VALIDATE,
+        application=BRONZE_SUBSCRIPTION_EVENTS_VALIDATE,
         application_args=["--mode", "output"],
         packages=SPARK_PACKAGES,
         conf=SPARK_CONF,

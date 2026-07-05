@@ -3,8 +3,9 @@ Silver Layer - SCD Type 2 Transformations
 
 This module orchestrates silver layer transformations:
 - silver_feature_states: SCD Type 2 dimension tracking feature version history
-- silver_user_dim: Simple user dimension table
+- silver_user_dim: User dimension (attribution + current subscription state)
 - silver_feature_usage_facts: Aggregated feature usage fact table
+- silver_subscription_periods: Periodized subscription lifecycle intervals
 """
 
 from pyspark.sql import SparkSession
@@ -12,6 +13,7 @@ from pyspark.sql.functions import col
 
 from spark.jobs.silver.feature_states.transformation import maintain_feature_states_scd
 from spark.jobs.silver.feature_usage_facts.transformation import create_feature_usage_facts
+from spark.jobs.silver.subscription_periods.transformation import create_subscription_periods
 from spark.jobs.silver.user_dim.transformation import maintain_user_dim
 
 
@@ -47,6 +49,11 @@ def run_silver_transformation(
 
     # Feature usage facts
     transformation_stats["feature_usage_facts"] = create_feature_usage_facts(
+        spark, bronze_path, silver_path
+    )
+
+    # Subscription periods
+    transformation_stats["subscription_periods"] = create_subscription_periods(
         spark, bronze_path, silver_path
     )
 
@@ -90,6 +97,7 @@ if __name__ == "__main__":
             "silver_feature_states",
             "silver_user_dim",
             "silver_feature_usage_facts",
+            "silver_subscription_periods",
         ]:
             table_path = f"data/silver/{table_name}"
             df = spark.read.format("delta").load(table_path)

@@ -38,6 +38,12 @@ class CompanySizeProfile(TypedDict):
     mrr_range: Dict[str, Tuple[int, int]]
 
 
+class ChannelConfig(TypedDict):
+    weight: float
+    conversion_mult: float
+    campaigns: List[str]
+
+
 # ── Configuration ──────────────────────────────────────────────────────────────
 START_DATE = datetime(2024, 1, 1)
 END_DATE = datetime(2024, 12, 31)
@@ -126,6 +132,65 @@ COMPANY_SIZE_PROFILES: Dict[str, CompanySizeProfile] = {
         "mrr_range": {"pro": (999, 1999), "enterprise": (4999, 9999)},
     },
 }
+
+# Acquisition channels: mix, conversion quality, and campaigns.
+# Referral/content bring high-intent users; paid_social/outbound convert worse.
+ATTRIBUTION_COVERAGE = 0.95  # 5% of signups arrive untracked (direct, lost UTM)
+
+CHANNELS: Dict[str, ChannelConfig] = {
+    "organic_search": {
+        "weight": 0.25,
+        "conversion_mult": 1.15,
+        "campaigns": ["seo_docs", "seo_blog", "seo_landing"],
+    },
+    "paid_search": {
+        "weight": 0.20,
+        "conversion_mult": 1.0,
+        "campaigns": ["google_brand", "google_competitor", "google_generic"],
+    },
+    "paid_social": {
+        "weight": 0.15,
+        "conversion_mult": 0.80,
+        "campaigns": ["linkedin_retargeting", "meta_lookalike", "linkedin_cold"],
+    },
+    "content_marketing": {
+        "weight": 0.12,
+        "conversion_mult": 1.25,
+        "campaigns": ["webinar_series", "ebook_plg", "newsletter"],
+    },
+    "referral": {
+        "weight": 0.10,
+        "conversion_mult": 1.40,
+        "campaigns": ["user_invite", "affiliate"],
+    },
+    "partner": {
+        "weight": 0.08,
+        "conversion_mult": 1.10,
+        "campaigns": ["marketplace_aws", "integration_slack"],
+    },
+    "outbound": {
+        "weight": 0.10,
+        "conversion_mult": 0.70,
+        "campaigns": ["sdr_sequence_q1", "sdr_sequence_q2"],
+    },
+}
+
+# Subscription lifecycle simulation (monthly hazard rates after conversion).
+# Feature adoption reduces churn: each adopted feature multiplies the churn
+# hazard by (1 - CHURN_REDUCTION_PER_FEATURE), floored at MIN_CHURN_MULT.
+MONTHLY_CHURN_BASE = {"pro": 0.045, "enterprise": 0.020}
+CHURN_REDUCTION_PER_FEATURE = 0.12
+MIN_CHURN_MULT = 0.40
+MONTHLY_EXPANSION_PROB = {  # seat growth scales with company size
+    "1-10": 0.03,
+    "11-50": 0.05,
+    "51-200": 0.07,
+    "201-1000": 0.09,
+    "1000+": 0.11,
+}
+MONTHLY_CONTRACTION_PROB = 0.020
+MONTHLY_UPGRADE_PROB = 0.015  # pro -> enterprise
+MONTHLY_DOWNGRADE_PROB = 0.008  # enterprise -> pro
 
 # Industry affects feature adoption rates
 INDUSTRY_ADOPTION_MULT: Dict[str, float] = {
@@ -268,6 +333,181 @@ def load_users(output_path: Path) -> List[Dict[str, Any]]:
     return users
 
 
+def generate_marketing_attribution(output_path: Path):
+    """Generate first-touch attribution records (one per tracked signup).
+
+    A small share of users stays unattributed (missing row) to mimic lost
+    UTM parameters and direct traffic — downstream joins must handle it.
+    """
+    print("Generating marketing attribution...")
+
+    users = load_users(output_path)
+    channel_names = list(CHANNELS.keys())
+    channel_weights = [CHANNELS[c]["weight"] for c in channel_names]
+
+    output_file = output_path / "marketing_attribution.jsonl"
+    attributed = 0
+
+    with open(output_file, "w") as f:
+        for user in users:
+            if random.random() >= ATTRIBUTION_COVERAGE:
+                continue  # untracked signup
+
+            channel = random.choices(channel_names, weights=channel_weights, k=1)[0]
+            campaign = random.choice(CHANNELS[channel]["campaigns"])
+            # First touch happens up to 14 days before signup
+            signup = datetime.strptime(user["signup_date"], "%Y-%m-%d")
+            touch_date = signup - timedelta(days=random.randint(0, 14))
+
+            record = {
+                "user_id": user["user_id"],
+                "channel": channel,
+                "campaign": campaign,
+                "first_touch_date": touch_date.strftime("%Y-%m-%d"),
+            }
+            f.write(json.dumps(record) + "\n")
+            attributed += 1
+
+    print(f"  ✓ {attributed} attribution records ({attributed / len(users) * 100:.1f}% of users)")
+
+
+def load_attribution(output_path: Path) -> Dict[int, str]:
+    """Return user_id -> channel for attributed users (empty dict if not generated)."""
+    attribution_file = output_path / "marketing_attribution.jsonl"
+    if not attribution_file.exists():
+        return {}
+    channels: Dict[int, str] = {}
+    with open(attribution_file, "r") as f:
+        for line in f:
+            record = json.loads(line)
+            channels[record["user_id"]] = record["channel"]
+    return channels
+
+
+def generate_subscription_events(output_path: Path):
+    """Simulate the post-conversion subscription lifecycle for each customer.
+
+    Walks month by month from conversion to END_DATE applying hazard rates for
+    churn, expansion, contraction, and plan changes. Feature adoption lowers
+    the churn hazard so that retention analyses have a real signal to find.
+    """
+    print("Generating subscription events...")
+
+    conversions_file = output_path / "conversions.jsonl"
+    if not conversions_file.exists():
+        print("Error: conversions.jsonl not found. Run conversion generation first.")
+        sys.exit(1)
+
+    users = {u["user_id"]: u for u in load_users(output_path)}
+
+    # Feature breadth per user (drives churn reduction)
+    features_per_user: Dict[int, Set[str]] = {}
+    events_file = output_path / "feature_usage_events.jsonl"
+    if events_file.exists():
+        with open(events_file, "r") as f:
+            for line in f:
+                evt = json.loads(line)
+                features_per_user.setdefault(evt["user_id"], set()).add(evt["feature_name"])
+
+    output_file = output_path / "subscription_events.jsonl"
+    event_id = 1
+    stats = {
+        "started": 0,
+        "expanded": 0,
+        "contracted": 0,
+        "upgraded": 0,
+        "downgraded": 0,
+        "cancelled": 0,
+    }
+
+    def write_event(f, uid, event_date, event_type, plan, mrr, prev_plan, prev_mrr):
+        nonlocal event_id
+        f.write(
+            json.dumps(
+                {
+                    "event_id": event_id,
+                    "user_id": uid,
+                    "event_date": event_date.strftime("%Y-%m-%d"),
+                    "event_type": event_type,
+                    "plan": plan,
+                    "mrr": mrr,
+                    "previous_plan": prev_plan,
+                    "previous_mrr": prev_mrr,
+                }
+            )
+            + "\n"
+        )
+        event_id += 1
+
+    with open(conversions_file, "r") as conv_f, open(output_file, "w") as f:
+        for line in conv_f:
+            conv = json.loads(line)
+            uid = conv["user_id"]
+            user = users[uid]
+            size_profile = COMPANY_SIZE_PROFILES[user["company_size"]]
+
+            plan = conv["plan"]
+            mrr = conv["mrr"]
+            start = datetime.strptime(conv["conversion_date"], "%Y-%m-%d")
+
+            write_event(f, uid, start, "subscription_started", plan, mrr, None, None)
+            stats["started"] += 1
+
+            # Churn hazard shrinks with feature breadth
+            n_features = len(features_per_user.get(uid, set()))
+            churn_mult = max(MIN_CHURN_MULT, (1 - CHURN_REDUCTION_PER_FEATURE) ** n_features)
+
+            current = start + timedelta(days=30)
+            while current <= END_DATE:
+                event_date = current + timedelta(days=random.randint(-5, 5))
+                if event_date > END_DATE:
+                    break
+
+                churn_prob = MONTHLY_CHURN_BASE[plan] * churn_mult
+                roll = random.random()
+
+                if roll < churn_prob:
+                    write_event(f, uid, event_date, "subscription_cancelled", None, 0, plan, mrr)
+                    stats["cancelled"] += 1
+                    break
+
+                roll -= churn_prob
+                if plan == "pro" and roll < MONTHLY_UPGRADE_PROB:
+                    new_low, new_high = size_profile["mrr_range"]["enterprise"]
+                    new_mrr = random.randint(new_low, new_high)
+                    write_event(
+                        f, uid, event_date, "plan_upgraded", "enterprise", new_mrr, plan, mrr
+                    )
+                    plan, mrr = "enterprise", new_mrr
+                    stats["upgraded"] += 1
+                elif plan == "enterprise" and roll < MONTHLY_DOWNGRADE_PROB:
+                    new_low, new_high = size_profile["mrr_range"]["pro"]
+                    new_mrr = random.randint(new_low, new_high)
+                    write_event(f, uid, event_date, "plan_downgraded", "pro", new_mrr, plan, mrr)
+                    plan, mrr = "pro", new_mrr
+                    stats["downgraded"] += 1
+                else:
+                    roll -= MONTHLY_UPGRADE_PROB if plan == "pro" else MONTHLY_DOWNGRADE_PROB
+                    expansion_prob = MONTHLY_EXPANSION_PROB[user["company_size"]]
+                    if roll < expansion_prob:
+                        new_mrr = int(mrr * random.uniform(1.10, 1.35))
+                        write_event(f, uid, event_date, "seats_expanded", plan, new_mrr, plan, mrr)
+                        mrr = new_mrr
+                        stats["expanded"] += 1
+                    elif roll < expansion_prob + MONTHLY_CONTRACTION_PROB:
+                        new_mrr = max(1, int(mrr * random.uniform(0.75, 0.95)))
+                        write_event(
+                            f, uid, event_date, "seats_contracted", plan, new_mrr, plan, mrr
+                        )
+                        mrr = new_mrr
+                        stats["contracted"] += 1
+
+                current += timedelta(days=30)
+
+    total = sum(stats.values())
+    print(f"  ✓ {total} subscription events: {stats}")
+
+
 def generate_feature_usage_events(output_path: Path) -> Dict[int, Set[str]]:
     """Generate feature usage events with per-feature adoption rates."""
     print("Generating feature usage events...")
@@ -387,6 +627,9 @@ def generate_conversions(output_path: Path, user_features: Dict[int, Set[str]] =
                     user_features[uid] = set()
                 user_features[uid].add(evt["feature_name"])
 
+    # Acquisition channel affects conversion quality (unattributed = neutral)
+    user_channels = load_attribution(output_path)
+
     output_file = output_path / "conversions.jsonl"
     conversions_generated = 0
 
@@ -407,8 +650,11 @@ def generate_conversions(output_path: Path, user_features: Dict[int, Set[str]] =
                 conversion_rate += config["conversion_boost"]
                 days_saved += config["days_saved"]
 
-            # Apply company size multiplier
+            # Apply company size and channel quality multipliers
             conversion_rate *= size_profile["conversion_mult"]
+            channel = user_channels.get(uid)
+            if channel is not None:
+                conversion_rate *= CHANNELS[channel]["conversion_mult"]
             conversion_rate = min(conversion_rate, 0.85)
 
             if random.random() >= conversion_rate:
@@ -550,6 +796,36 @@ def validate_data(output_path: Path):
             print(f"   WITH real_time_collab: {avg_days_with:.1f} days")
             print(f"   WITHOUT real_time_collab: {avg_days_without:.1f} days")
 
+    # Channel performance
+    user_channels = load_attribution(output_path)
+    if user_channels and conversions_file.exists():
+        converted_ids = {c["user_id"] for c in conversions}
+        print("\n📣 Conversion Rate by Channel:")
+        for channel in CHANNELS:
+            channel_users = [uid for uid, ch in user_channels.items() if ch == channel]
+            if not channel_users:
+                continue
+            converted = sum(1 for uid in channel_users if uid in converted_ids)
+            print(
+                f"   {channel:<20} {converted / len(channel_users) * 100:5.1f}% "
+                f"({converted}/{len(channel_users)})"
+            )
+
+    # Subscription lifecycle
+    subscription_file = output_path / "subscription_events.jsonl"
+    if subscription_file.exists():
+        with open(subscription_file, "r") as f:
+            sub_events = [json.loads(line) for line in f]
+        by_type: Dict[str, int] = {}
+        for e in sub_events:
+            by_type[e["event_type"]] = by_type.get(e["event_type"], 0) + 1
+        started = by_type.get("subscription_started", 0)
+        cancelled = by_type.get("subscription_cancelled", 0)
+        print(f"\n🔄 Subscription events: {len(sub_events)}")
+        print(f"   By type: {by_type}")
+        if started:
+            print(f"   Lifetime churn: {cancelled / started * 100:.1f}% of customers")
+
     print("\n" + "=" * 60)
 
 
@@ -560,7 +836,15 @@ def main():
     parser.add_argument(
         "--generate",
         nargs="+",
-        choices=["features", "signups", "usage", "conversions", "all"],
+        choices=[
+            "features",
+            "signups",
+            "attribution",
+            "usage",
+            "conversions",
+            "subscriptions",
+            "all",
+        ],
         default=["all"],
         help="Specify which data to generate (default: all)",
     )
@@ -583,7 +867,14 @@ def main():
 
     generate_items = args.generate
     if "all" in generate_items:
-        generate_items = ["features", "signups", "usage", "conversions"]
+        generate_items = [
+            "features",
+            "signups",
+            "attribution",
+            "usage",
+            "conversions",
+            "subscriptions",
+        ]
 
     user_features = None
 
@@ -593,11 +884,17 @@ def main():
     if "signups" in generate_items:
         generate_user_signups(output_path)
 
+    if "attribution" in generate_items:
+        generate_marketing_attribution(output_path)
+
     if "usage" in generate_items:
         user_features = generate_feature_usage_events(output_path)
 
     if "conversions" in generate_items:
         generate_conversions(output_path, user_features)
+
+    if "subscriptions" in generate_items:
+        generate_subscription_events(output_path)
 
     if args.validate or "all" in args.generate:
         validate_data(output_path)

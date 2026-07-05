@@ -1,21 +1,24 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import coalesce, col, lit, row_number, to_date
+from pyspark.sql.functions import coalesce, col, lit, row_number, to_date, when
 from pyspark.sql.window import Window
+
+from spark.jobs.silver.user_dim.schema import USER_DIM_COLUMNS
 
 
 def maintain_user_dim(spark: SparkSession, bronze_path: str, silver_path: str) -> int:
     """
-    Create/update a simple user dimension table from bronze user signups.
+    Create/update the user dimension table from bronze sources.
 
-    This is a simplified dimension (not full SCD Type 2 for MVP).
-    Later could add SCD for plan changes (free -> pro -> enterprise).
+    Combines three bronze tables:
+      - user_signups:          identity and firmographics
+      - marketing_attribution: first-touch channel/campaign ('unattributed'
+                               for the ~5% of signups without a record)
+      - subscription_events:   current commercial state, derived from each
+                               user's latest lifecycle event
 
-    Schema:
-        user_id (INT)
-        signup_date (DATE)
-        company_size (STRING)
-        industry (STRING)
-        current_plan (STRING)    - Joined from conversions, defaults to 'free'
+    Plan resolution: never converted -> 'free'; latest event is a
+    cancellation -> 'churned'; otherwise the plan on the latest event.
+    current_mrr is 0 unless the user holds an active subscription.
 
     Args:
         spark: SparkSession
@@ -28,35 +31,54 @@ def maintain_user_dim(spark: SparkSession, bronze_path: str, silver_path: str) -
     output_path = f"{silver_path}/silver_user_dim"
     print(f"Maintaining user dimension at {output_path}")
 
-    # Read bronze user signups
     signups = spark.read.format("delta").load(f"{bronze_path}/user_signups")
+    attribution = spark.read.format("delta").load(f"{bronze_path}/marketing_attribution")
+    subscription_events = spark.read.format("delta").load(f"{bronze_path}/subscription_events")
 
-    # Read bronze conversions to get current plan
-    conversions = spark.read.format("delta").load(f"{bronze_path}/conversions")
-
-    # Get the latest conversion per user using window function (avoids self-join ambiguity)
-    conv_window = Window.partitionBy("user_id").orderBy(col("conversion_date").desc())
-    latest_conversions = (
-        conversions.withColumn("rn", row_number().over(conv_window))
+    # Latest subscription event per user determines the current commercial state
+    event_window = Window.partitionBy("user_id").orderBy(
+        col("event_date").desc(), col("event_id").desc()
+    )
+    latest_state = (
+        subscription_events.withColumn("rn", row_number().over(event_window))
         .filter(col("rn") == 1)
         .select(
-            col("user_id").alias("conv_user_id"),
-            col("plan").alias("current_plan"),
+            col("user_id").alias("sub_user_id"),
+            when(col("event_type") == "subscription_cancelled", lit("churned"))
+            .otherwise(col("plan"))
+            .alias("current_plan"),
+            when(col("event_type") == "subscription_cancelled", lit(0))
+            .otherwise(col("mrr"))
+            .alias("current_mrr"),
         )
     )
 
-    # Build user dimension: join signups with latest conversion
+    first_touch = attribution.select(
+        col("user_id").alias("attr_user_id"),
+        col("channel").alias("acquisition_channel"),
+        col("campaign").alias("acquisition_campaign"),
+    ).dropDuplicates(["attr_user_id"])
+
     user_dim = (
         signups.select("user_id", "signup_date", "company_size", "industry")
         .dropDuplicates(["user_id"])
-        .join(latest_conversions, col("user_id") == col("conv_user_id"), "left")
+        .join(first_touch, col("user_id") == col("attr_user_id"), "left")
+        .join(latest_state, col("user_id") == col("sub_user_id"), "left")
+        .withColumn(
+            "acquisition_channel", coalesce(col("acquisition_channel"), lit("unattributed"))
+        )
+        .withColumn(
+            "acquisition_campaign", coalesce(col("acquisition_campaign"), lit("unattributed"))
+        )
         .withColumn("current_plan", coalesce(col("current_plan"), lit("free")))
+        .withColumn("current_mrr", coalesce(col("current_mrr"), lit(0)))
         .withColumn("signup_date", to_date(col("signup_date")))
-        .select("user_id", "signup_date", "company_size", "industry", "current_plan")
+        .select(*USER_DIM_COLUMNS)
     )
 
-    # Write/overwrite the dimension table
-    user_dim.write.format("delta").mode("overwrite").save(output_path)
+    user_dim.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(
+        output_path
+    )
 
     row_count = user_dim.count()
     print(f"  User dimension complete: {row_count} users")

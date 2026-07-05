@@ -74,6 +74,12 @@ BRONZE_FEATURE_USAGE_EVENTS_APP = f"{SPARK_JOBS_BASE}/bronze/feature_usage_event
 BRONZE_FEATURE_USAGE_EVENTS_VALIDATE = f"{SPARK_JOBS_BASE}/bronze/feature_usage_events/validate.py"
 BRONZE_CONVERSIONS_APP = f"{SPARK_JOBS_BASE}/bronze/conversions/main.py"
 BRONZE_CONVERSIONS_VALIDATE = f"{SPARK_JOBS_BASE}/bronze/conversions/validate.py"
+BRONZE_MARKETING_ATTRIBUTION_APP = f"{SPARK_JOBS_BASE}/bronze/marketing_attribution/main.py"
+BRONZE_MARKETING_ATTRIBUTION_VALIDATE = (
+    f"{SPARK_JOBS_BASE}/bronze/marketing_attribution/validate.py"
+)
+BRONZE_SUBSCRIPTION_EVENTS_APP = f"{SPARK_JOBS_BASE}/bronze/subscription_events/main.py"
+BRONZE_SUBSCRIPTION_EVENTS_VALIDATE = f"{SPARK_JOBS_BASE}/bronze/subscription_events/validate.py"
 
 # Silver
 SILVER_FEATURE_STATES_APP = f"{SPARK_JOBS_BASE}/silver/feature_states/main.py"
@@ -82,12 +88,20 @@ SILVER_USER_DIM_APP = f"{SPARK_JOBS_BASE}/silver/user_dim/main.py"
 SILVER_USER_DIM_VALIDATE = f"{SPARK_JOBS_BASE}/silver/user_dim/validate.py"
 SILVER_FEATURE_USAGE_FACTS_APP = f"{SPARK_JOBS_BASE}/silver/feature_usage_facts/main.py"
 SILVER_FEATURE_USAGE_FACTS_VALIDATE = f"{SPARK_JOBS_BASE}/silver/feature_usage_facts/validate.py"
+SILVER_SUBSCRIPTION_PERIODS_APP = f"{SPARK_JOBS_BASE}/silver/subscription_periods/main.py"
+SILVER_SUBSCRIPTION_PERIODS_VALIDATE = f"{SPARK_JOBS_BASE}/silver/subscription_periods/validate.py"
 
 # Gold
 GOLD_FEATURE_CONVERSION_IMPACT_APP = f"{SPARK_JOBS_BASE}/gold/feature_conversion_impact/main.py"
 GOLD_FEATURE_CONVERSION_IMPACT_VALIDATE = (
     f"{SPARK_JOBS_BASE}/gold/feature_conversion_impact/validate.py"
 )
+GOLD_MRR_WATERFALL_APP = f"{SPARK_JOBS_BASE}/gold/mrr_waterfall/main.py"
+GOLD_MRR_WATERFALL_VALIDATE = f"{SPARK_JOBS_BASE}/gold/mrr_waterfall/validate.py"
+GOLD_CHANNEL_PERFORMANCE_APP = f"{SPARK_JOBS_BASE}/gold/channel_performance/main.py"
+GOLD_CHANNEL_PERFORMANCE_VALIDATE = f"{SPARK_JOBS_BASE}/gold/channel_performance/validate.py"
+GOLD_WEEKLY_ENGAGEMENT_APP = f"{SPARK_JOBS_BASE}/gold/weekly_engagement/main.py"
+GOLD_WEEKLY_ENGAGEMENT_VALIDATE = f"{SPARK_JOBS_BASE}/gold/weekly_engagement/validate.py"
 
 # ---------------------------------------------------------------------------
 # Airflow Datasets for cross-DAG scheduling
@@ -96,9 +110,15 @@ DATASET_BRONZE_FEATURE_RELEASES = Dataset("delta://bronze/feature_releases")
 DATASET_BRONZE_USER_SIGNUPS = Dataset("delta://bronze/user_signups")
 DATASET_BRONZE_FEATURE_USAGE_EVENTS = Dataset("delta://bronze/feature_usage_events")
 DATASET_BRONZE_CONVERSIONS = Dataset("delta://bronze/conversions")
+DATASET_BRONZE_MARKETING_ATTRIBUTION = Dataset("delta://bronze/marketing_attribution")
+DATASET_BRONZE_SUBSCRIPTION_EVENTS = Dataset("delta://bronze/subscription_events")
 
 DATASET_SILVER_FEATURE_STATES = Dataset("delta://silver/feature_states")
 DATASET_SILVER_USER_DIM = Dataset("delta://silver/user_dim")
 DATASET_SILVER_FEATURE_USAGE_FACTS = Dataset("delta://silver/feature_usage_facts")
+DATASET_SILVER_SUBSCRIPTION_PERIODS = Dataset("delta://silver/subscription_periods")
 
 DATASET_GOLD_FEATURE_CONVERSION_IMPACT = Dataset("delta://gold/feature_conversion_impact")
+DATASET_GOLD_MRR_WATERFALL = Dataset("delta://gold/mrr_waterfall")
+DATASET_GOLD_CHANNEL_PERFORMANCE = Dataset("delta://gold/channel_performance")
+DATASET_GOLD_WEEKLY_ENGAGEMENT = Dataset("delta://gold/weekly_engagement")

@@ -5,14 +5,17 @@ import sys
 
 from pyspark.sql import SparkSession
 
-from spark.jobs.bronze.conversions.schema import CONVERSIONS_OUTPUT_SCHEMA
+from spark.jobs.bronze.marketing_attribution.schema import (
+    MARKETING_ATTRIBUTION_OUTPUT_SCHEMA,
+)
+from spark.jobs.bronze.subscription_events.schema import SUBSCRIPTION_EVENTS_OUTPUT_SCHEMA
 from spark.jobs.bronze.user_signups.schema import USER_SIGNUPS_OUTPUT_SCHEMA
 from spark.jobs.data_quality.validators import validate_delta_table
 from spark.jobs.silver.user_dim.schema import USER_DIM_SCHEMA
 
 
 def validate_input(spark: SparkSession, bronze_path: str = "data/bronze") -> dict:
-    """Validate the upstream bronze user_signups and conversions Delta tables."""
+    """Validate the upstream bronze signups, attribution, and subscription tables."""
     counts = {}
     counts["user_signups"] = validate_delta_table(
         spark,
@@ -20,11 +23,17 @@ def validate_input(spark: SparkSession, bronze_path: str = "data/bronze") -> dic
         expected_schema=USER_SIGNUPS_OUTPUT_SCHEMA,
         table_name="silver.user_dim (input: bronze.user_signups)",
     )
-    counts["conversions"] = validate_delta_table(
+    counts["marketing_attribution"] = validate_delta_table(
         spark,
-        path=f"{bronze_path}/conversions",
-        expected_schema=CONVERSIONS_OUTPUT_SCHEMA,
-        table_name="silver.user_dim (input: bronze.conversions)",
+        path=f"{bronze_path}/marketing_attribution",
+        expected_schema=MARKETING_ATTRIBUTION_OUTPUT_SCHEMA,
+        table_name="silver.user_dim (input: bronze.marketing_attribution)",
+    )
+    counts["subscription_events"] = validate_delta_table(
+        spark,
+        path=f"{bronze_path}/subscription_events",
+        expected_schema=SUBSCRIPTION_EVENTS_OUTPUT_SCHEMA,
+        table_name="silver.user_dim (input: bronze.subscription_events)",
     )
     return counts
 

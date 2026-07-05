@@ -1,20 +1,17 @@
 """
-Silver DAG: user_dim
+Silver DAG: subscription_periods
 
-Schedule: Triggered when bronze_user_signups, bronze_marketing_attribution,
-and bronze_subscription_events datasets are updated
-Produces: DATASET_SILVER_USER_DIM
+Schedule: Triggered when the bronze_subscription_events dataset is updated
+Produces: DATASET_SILVER_SUBSCRIPTION_PERIODS
 """
 
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from config import (
-    DATASET_BRONZE_MARKETING_ATTRIBUTION,
     DATASET_BRONZE_SUBSCRIPTION_EVENTS,
-    DATASET_BRONZE_USER_SIGNUPS,
-    DATASET_SILVER_USER_DIM,
+    DATASET_SILVER_SUBSCRIPTION_PERIODS,
     DEFAULT_ARGS,
-    SILVER_USER_DIM_APP,
-    SILVER_USER_DIM_VALIDATE,
+    SILVER_SUBSCRIPTION_PERIODS_APP,
+    SILVER_SUBSCRIPTION_PERIODS_VALIDATE,
     SPARK_CONF,
     SPARK_CONN_ID,
     SPARK_ENV_VARS,
@@ -24,20 +21,16 @@ from config import (
 from airflow import DAG
 
 with DAG(
-    "silver_user_dim",
+    "silver_subscription_periods",
     default_args=DEFAULT_ARGS,
-    description="User dimension from signups, attribution, and subscription state",
-    schedule=[
-        DATASET_BRONZE_USER_SIGNUPS,
-        DATASET_BRONZE_MARKETING_ATTRIBUTION,
-        DATASET_BRONZE_SUBSCRIPTION_EVENTS,
-    ],
+    description="Periodize subscription lifecycle events into validity intervals",
+    schedule=[DATASET_BRONZE_SUBSCRIPTION_EVENTS],
     catchup=False,
 ) as dag:
     assert_input_quality = SparkSubmitOperator(
         task_id="assert_input_quality",
         conn_id=SPARK_CONN_ID,
-        application=SILVER_USER_DIM_VALIDATE,
+        application=SILVER_SUBSCRIPTION_PERIODS_VALIDATE,
         application_args=["--mode", "input"],
         packages=SPARK_PACKAGES,
         conf=SPARK_CONF,
@@ -47,17 +40,17 @@ with DAG(
     process = SparkSubmitOperator(
         task_id="process",
         conn_id=SPARK_CONN_ID,
-        application=SILVER_USER_DIM_APP,
+        application=SILVER_SUBSCRIPTION_PERIODS_APP,
         packages=SPARK_PACKAGES,
         conf=SPARK_CONF,
         env_vars=SPARK_ENV_VARS,
-        outlets=[DATASET_SILVER_USER_DIM],
+        outlets=[DATASET_SILVER_SUBSCRIPTION_PERIODS],
     )
 
     assert_output_quality = SparkSubmitOperator(
         task_id="assert_output_quality",
         conn_id=SPARK_CONN_ID,
-        application=SILVER_USER_DIM_VALIDATE,
+        application=SILVER_SUBSCRIPTION_PERIODS_VALIDATE,
         application_args=["--mode", "output"],
         packages=SPARK_PACKAGES,
         conf=SPARK_CONF,

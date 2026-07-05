@@ -10,6 +10,8 @@ from pyspark.sql import SparkSession
 from spark.jobs.bronze.conversions.extract import ingest_conversions
 from spark.jobs.bronze.feature_releases.extract import ingest_feature_releases
 from spark.jobs.bronze.feature_usage_events.extract import ingest_feature_usage_events
+from spark.jobs.bronze.marketing_attribution.extract import ingest_marketing_attribution
+from spark.jobs.bronze.subscription_events.extract import ingest_subscription_events
 from spark.jobs.bronze.user_signups.extract import ingest_user_signups
 
 
@@ -46,6 +48,20 @@ def run_bronze_ingestion(spark, raw_data_path="data/raw", bronze_path="data/bron
     # Ingest conversions
     ingestion_stats["conversions"] = ingest_conversions(
         spark, f"{raw_data_path}/conversions.jsonl", f"{bronze_path}/conversions"
+    )
+
+    # Ingest marketing attribution
+    ingestion_stats["marketing_attribution"] = ingest_marketing_attribution(
+        spark,
+        f"{raw_data_path}/marketing_attribution.jsonl",
+        f"{bronze_path}/marketing_attribution",
+    )
+
+    # Ingest subscription events
+    ingestion_stats["subscription_events"] = ingest_subscription_events(
+        spark,
+        f"{raw_data_path}/subscription_events.jsonl",
+        f"{bronze_path}/subscription_events",
     )
 
     print("=" * 80)
@@ -89,6 +105,8 @@ if __name__ == "__main__":
             "user_signups",
             "feature_usage_events",
             "conversions",
+            "marketing_attribution",
+            "subscription_events",
         ]:
             table_path = f"data/bronze/{table_name}"
             df = spark.read.format("delta").load(table_path)
