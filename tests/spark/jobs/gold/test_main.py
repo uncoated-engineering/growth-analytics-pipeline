@@ -57,10 +57,19 @@ class TestRunGoldAggregation:
 
         assert isinstance(stats, dict)
         assert "feature_conversion_impact" in stats
+        assert "mrr_waterfall" in stats
+        assert "channel_performance" in stats
+        assert "weekly_engagement" in stats
         assert stats["feature_conversion_impact"] > 0
+        # One derived subscription_started event -> one waterfall month
+        assert stats["mrr_waterfall"] == 1
+        # One signup-month x channel bucket ('unattributed')
+        assert stats["channel_performance"] == 1
+        # One usage event -> one week-feature row
+        assert stats["weekly_engagement"] == 1
 
-    def test_run_gold_aggregation_creates_table(self, spark, temp_dir):
-        """Test that run_gold_aggregation creates the gold Delta table."""
+    def test_run_gold_aggregation_creates_tables(self, spark, temp_dir):
+        """Test that run_gold_aggregation creates the gold Delta tables."""
         releases = [
             {"id": 1, "name": "feature_a", "release_date": "2024-01-01", "version": "v1.0"},
         ]
@@ -92,7 +101,17 @@ class TestRunGoldAggregation:
 
         run_gold_aggregation(spark, bronze_path, silver_path, gold_path)
 
-        table_path = os.path.join(gold_path, "gold_feature_conversion_impact")
-        assert os.path.exists(table_path)
-        df = spark.read.format("delta").load(table_path)
+        # Every gold table must be created (weekly engagement is empty: no events)
+        for table_name in [
+            "gold_feature_conversion_impact",
+            "gold_mrr_waterfall",
+            "gold_channel_performance",
+            "gold_weekly_engagement",
+        ]:
+            table_path = os.path.join(gold_path, table_name)
+            assert os.path.exists(table_path), f"Table {table_name} should exist"
+
+        df = spark.read.format("delta").load(
+            os.path.join(gold_path, "gold_feature_conversion_impact")
+        )
         assert df.count() > 0

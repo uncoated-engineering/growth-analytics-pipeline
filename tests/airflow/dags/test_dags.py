@@ -1,7 +1,7 @@
 """
 Tests for the per-table Airflow DAGs.
 
-Validates that all 8 DAGs load correctly, each has the expected 3-task
+Validates that all 14 DAGs load correctly, each has the expected 3-task
 chain (assert_input_quality -> process -> assert_output_quality),
 and that cross-DAG Dataset dependencies are configured correctly.
 """
@@ -28,17 +28,23 @@ def dagbag():
 
 
 # ---------------------------------------------------------------------------
-# All 8 DAG IDs
+# All 14 DAG IDs
 # ---------------------------------------------------------------------------
 ALL_DAG_IDS = [
     "bronze_feature_releases",
     "bronze_user_signups",
     "bronze_feature_usage_events",
     "bronze_conversions",
+    "bronze_marketing_attribution",
+    "bronze_subscription_events",
     "silver_feature_states",
     "silver_user_dim",
     "silver_feature_usage_facts",
+    "silver_subscription_periods",
     "gold_feature_conversion_impact",
+    "gold_mrr_waterfall",
+    "gold_channel_performance",
+    "gold_weekly_engagement",
 ]
 
 
@@ -55,8 +61,8 @@ class TestDagLoading:
         ), f"DAG '{dag_id}' not found. Available: {list(dagbag.dags.keys())}"
 
     def test_dag_count(self, dagbag):
-        """Exactly 8 DAGs should be loaded (no leftover monolithic DAG)."""
-        assert len(dagbag.dags) == 8
+        """Exactly 14 DAGs should be loaded (no leftover monolithic DAG)."""
+        assert len(dagbag.dags) == 14
 
 
 class TestTaskStructure:
@@ -130,6 +136,8 @@ class TestBronzeSchedule:
         "bronze_user_signups",
         "bronze_feature_usage_events",
         "bronze_conversions",
+        "bronze_marketing_attribution",
+        "bronze_subscription_events",
     ]
 
     @pytest.mark.parametrize("dag_id", BRONZE_DAGS)
@@ -161,16 +169,22 @@ class TestDatasetDependencies:
         uris = self._get_schedule_datasets(dag)
         assert "delta://bronze/feature_releases" in uris
 
-    def test_silver_user_dim_depends_on_bronze_signups_and_conversions(self, dagbag):
+    def test_silver_user_dim_depends_on_signups_attribution_and_subscriptions(self, dagbag):
         dag = dagbag.dags["silver_user_dim"]
         uris = self._get_schedule_datasets(dag)
         assert "delta://bronze/user_signups" in uris
-        assert "delta://bronze/conversions" in uris
+        assert "delta://bronze/marketing_attribution" in uris
+        assert "delta://bronze/subscription_events" in uris
 
     def test_silver_feature_usage_facts_depends_on_bronze_events(self, dagbag):
         dag = dagbag.dags["silver_feature_usage_facts"]
         uris = self._get_schedule_datasets(dag)
         assert "delta://bronze/feature_usage_events" in uris
+
+    def test_silver_subscription_periods_depends_on_bronze_subscription_events(self, dagbag):
+        dag = dagbag.dags["silver_subscription_periods"]
+        uris = self._get_schedule_datasets(dag)
+        assert "delta://bronze/subscription_events" in uris
 
     def test_gold_depends_on_all_upstream(self, dagbag):
         dag = dagbag.dags["gold_feature_conversion_impact"]
@@ -179,6 +193,22 @@ class TestDatasetDependencies:
         assert "delta://silver/feature_states" in uris
         assert "delta://silver/feature_usage_facts" in uris
         assert "delta://bronze/conversions" in uris
+
+    def test_gold_mrr_waterfall_depends_on_bronze_subscription_events(self, dagbag):
+        dag = dagbag.dags["gold_mrr_waterfall"]
+        uris = self._get_schedule_datasets(dag)
+        assert "delta://bronze/subscription_events" in uris
+
+    def test_gold_channel_performance_depends_on_user_dim_and_conversions(self, dagbag):
+        dag = dagbag.dags["gold_channel_performance"]
+        uris = self._get_schedule_datasets(dag)
+        assert "delta://silver/user_dim" in uris
+        assert "delta://bronze/conversions" in uris
+
+    def test_gold_weekly_engagement_depends_on_bronze_usage_events(self, dagbag):
+        dag = dagbag.dags["gold_weekly_engagement"]
+        uris = self._get_schedule_datasets(dag)
+        assert "delta://bronze/feature_usage_events" in uris
 
 
 class TestProcessOutlets:
@@ -194,10 +224,16 @@ class TestProcessOutlets:
         "bronze_user_signups": "delta://bronze/user_signups",
         "bronze_feature_usage_events": "delta://bronze/feature_usage_events",
         "bronze_conversions": "delta://bronze/conversions",
+        "bronze_marketing_attribution": "delta://bronze/marketing_attribution",
+        "bronze_subscription_events": "delta://bronze/subscription_events",
         "silver_feature_states": "delta://silver/feature_states",
         "silver_user_dim": "delta://silver/user_dim",
         "silver_feature_usage_facts": "delta://silver/feature_usage_facts",
+        "silver_subscription_periods": "delta://silver/subscription_periods",
         "gold_feature_conversion_impact": "delta://gold/feature_conversion_impact",
+        "gold_mrr_waterfall": "delta://gold/mrr_waterfall",
+        "gold_channel_performance": "delta://gold/channel_performance",
+        "gold_weekly_engagement": "delta://gold/weekly_engagement",
     }
 
     @pytest.mark.parametrize("dag_id", ALL_DAG_IDS)
