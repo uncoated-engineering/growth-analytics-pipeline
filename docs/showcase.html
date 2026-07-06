@@ -187,10 +187,10 @@
   .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 10px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
   .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-  .chart-wrap { position: relative; overflow-x: auto; }
+  .chart-wrap { position: relative; }
   .chart-wrap svg { display: block; width: 100%; height: auto; }
   .tooltip {
-    position: absolute; pointer-events: none; opacity: 0;
+    position: absolute; top: 0; left: 0; pointer-events: none; opacity: 0;
     background: var(--ink); color: var(--page);
     border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.5;
     font-family: var(--mono); white-space: nowrap; z-index: 5;
