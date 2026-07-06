@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth Analytics Platform — project showcase</title>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}</style>
+</head>
+<body>
+<style>
+  :root {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --accent-deep: #1c5cab;
+    --gain-1: #2a78d6;
+    --gain-2: #86b6ef;
+    --loss-1: #e34948;
+    --loss-2: #f0a3a2;
+    --bronze-wash: #f3e7dc;
+    --bronze-ink: #7a4a22;
+    --silver-wash: #e9ecf0;
+    --silver-ink: #46525f;
+    --gold-wash: #f6ecd2;
+    --gold-ink: #7a5c0d;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --accent-deep: #86b6ef;
+      --gain-1: #3987e5;
+      --gain-2: #6da7ec;
+      --loss-1: #e66767;
+      --loss-2: #a34140;
+      --bronze-wash: #2e2118;
+      --bronze-ink: #d9a273;
+      --silver-wash: #23272c;
+      --silver-ink: #aab6c2;
+      --gold-wash: #2b2413;
+      --gold-ink: #d9b45a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --accent-deep: #86b6ef;
+    --gain-1: #3987e5;
+    --gain-2: #6da7ec;
+    --loss-1: #e66767;
+    --loss-2: #a34140;
+    --bronze-wash: #2e2118;
+    --bronze-ink: #d9a273;
+    --silver-wash: #23272c;
+    --silver-ink: #aab6c2;
+    --gold-wash: #2b2413;
+    --gold-ink: #d9b45a;
+  }
+  :root[data-theme="light"] {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --accent-deep: #1c5cab;
+    --gain-1: #2a78d6;
+    --gain-2: #86b6ef;
+    --loss-1: #e34948;
+    --loss-2: #f0a3a2;
+    --bronze-wash: #f3e7dc;
+    --bronze-ink: #7a4a22;
+    --silver-wash: #e9ecf0;
+    --silver-ink: #46525f;
+    --gold-wash: #f6ecd2;
+    --gold-ink: #7a5c0d;
+  }
+
+  body { background: var(--page); }
+  .ga-root {
+    font-family: var(--sans);
+    color: var(--ink);
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+    line-height: 1.55;
+  }
+  .ga-root a { color: var(--accent-deep); text-decoration: none; }
+  .ga-root a:hover { text-decoration: underline; }
+  .ga-root a:focus-visible, .ga-root [tabindex]:focus-visible, .ga-root summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-size: clamp(34px, 6vw, 52px);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin: 10px 0 14px;
+    text-wrap: balance;
+  }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 62ch; margin: 0 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: 64px; }
+  h2 {
+    font-size: 24px; font-weight: 750; letter-spacing: -0.015em;
+    margin: 6px 0 6px; text-wrap: balance;
+  }
+  .section-note { color: var(--ink-2); max-width: 68ch; margin: 0 0 20px; }
+  .section-note code, .flow code, td code {
+    font-family: var(--mono); font-size: 0.9em;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 5px;
+  }
+
+  /* Stat strip */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 28px; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat .v { font-size: 26px; font-weight: 750; letter-spacing: -0.02em; }
+  .stat .k { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+  /* Medallion flow */
+  .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: stretch; }
+  .layer {
+    border-radius: 10px; padding: 14px 16px; border: 1px solid var(--border);
+  }
+  .layer.bronze { background: var(--bronze-wash); }
+  .layer.silver { background: var(--silver-wash); }
+  .layer.gold { background: var(--gold-wash); }
+  .layer h3 { margin: 0 0 2px; font-size: 15px; font-weight: 700; }
+  .layer.bronze h3 { color: var(--bronze-ink); }
+  .layer.silver h3 { color: var(--silver-ink); }
+  .layer.gold h3 { color: var(--gold-ink); }
+  .layer .role { font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
+  .layer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .layer li { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .flow .arrow { align-self: center; color: var(--muted); font-size: 20px; }
+  .flow-caption { margin-top: 14px; }
+  @media (max-width: 720px) {
+    .flow { grid-template-columns: 1fr; }
+    .flow .arrow { transform: rotate(90deg); justify-self: center; }
+  }
+
+  /* Chart blocks */
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px 20px 14px; margin-top: 20px;
+  }
+  .chart-card h3 { margin: 0; font-size: 16px; font-weight: 700; }
+  .chart-card .sub { font-size: 13px; color: var(--muted); margin: 2px 0 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .chart-wrap { position: relative; overflow-x: auto; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; }
+  .tooltip {
+    position: absolute; pointer-events: none; opacity: 0;
+    background: var(--ink); color: var(--page);
+    border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.5;
+    font-family: var(--mono); white-space: nowrap; z-index: 5;
+    transition: opacity 80ms linear;
+  }
+  @media (prefers-reduced-motion: reduce) { .tooltip { transition: none; } }
+  .axis-label { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+  .table-view { margin-top: 10px; }
+  .table-view summary { cursor: pointer; font-size: 13px; color: var(--ink-2); }
+  .table-view table { border-collapse: collapse; margin-top: 10px; width: 100%; font-size: 12.5px; }
+  .table-view th, .table-view td {
+    text-align: right; padding: 4px 10px; border-bottom: 1px solid var(--grid);
+    font-variant-numeric: tabular-nums;
+  }
+  .table-view th:first-child, .table-view td:first-child { text-align: left; font-family: var(--mono); }
+  .table-view th { color: var(--muted); font-weight: 600; }
+
+  /* Governance loop */
+  .loop { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .loop .node {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px;
+  }
+  .loop .node h4 { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+  .loop .node p { margin: 0; font-size: 13px; color: var(--ink-2); }
+  .loop .node .tag { font-family: var(--mono); font-size: 11px; color: var(--muted); display: block; margin-bottom: 6px; }
+
+  /* Chat transcript */
+  .chat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px; display: flex; flex-direction: column; gap: 14px; max-width: 720px;
+  }
+  .chat .q, .chat .a { padding: 10px 14px; border-radius: 10px; font-size: 14.5px; }
+  .chat .q {
+    align-self: flex-end; background: var(--accent); color: #fff; max-width: 80%;
+    border-bottom-right-radius: 3px;
+  }
+  .chat .a { align-self: stretch; background: var(--page); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
+  .chat .a p { margin: 0 0 8px; }
+  .chat .a p:last-child { margin-bottom: 0; }
+  .chat .toolcall {
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    border-left: 3px solid var(--accent); padding: 4px 10px; margin: 10px 0 4px;
+    overflow-x: auto;
+  }
+  .chat .a .num { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Practice grid */
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .practice {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px;
+  }
+  .practice h4 { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+  .practice p { margin: 0; font-size: 13px; color: var(--ink-2); }
+
+  /* Quickstart */
+  pre.term {
+    background: #10100f; color: #e8e6dd; border-radius: 10px; border: 1px solid var(--border);
+    padding: 18px 20px; font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    overflow-x: auto; margin: 16px 0 0;
+  }
+  pre.term .c { color: #898781; }
+  pre.term .p { color: #86b6ef; }
+
+  footer.ga-footer {
+    margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--grid);
+    font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 24px;
+  }
+  footer.ga-footer a { color: var(--ink-2); }
+</style>
+
+<div class="ga-root">
+  <header>
+    <div class="eyebrow">portfolio project · data platform, end to end</div>
+    <h1>Growth Analytics Platform</h1>
+    <p class="lede">
+      A complete analytics stack for a synthetic SaaS product-led-growth company:
+      <strong>Spark&nbsp;+&nbsp;Delta lakehouse</strong>, <strong>Airflow</strong> data-aware orchestration,
+      <strong>data contracts</strong> with generated dictionary &amp; lineage, a <strong>semantic layer</strong>
+      served by DuckDB — and a <strong>Claude-powered chatbot</strong> that answers business questions
+      with auditable queries.
+    </p>
+    <div class="stats">
+      <div class="stat"><div class="v">$2.27M</div><div class="k">ending MRR built up over 2024</div></div>
+      <div class="stat"><div class="v">14</div><div class="k">Delta tables · bronze → silver → gold</div></div>
+      <div class="stat"><div class="v">14</div><div class="k">Airflow DAGs, Dataset-triggered</div></div>
+      <div class="stat"><div class="v">20+</div><div class="k">governed metrics in the semantic layer</div></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="eyebrow">architecture</div>
+    <h2>A medallion lakehouse with a governed serving layer</h2>
+    <p class="section-note">
+      Raw JSONL feeds land append-only in bronze; silver conforms them (SCD&nbsp;Type&nbsp;2 dimensions,
+      subscription-event periodization); gold ships business marts. Every table is its own PySpark module
+      with schema, transformation, and input/output <em>data-quality gates</em> that Airflow runs around
+      each task.
+    </p>
+    <div class="flow">
+      <div class="layer bronze">
+        <h3>Bronze</h3>
+        <div class="role">raw, append-only</div>
+        <ul>
+          <li>user_signups</li>
+          <li>feature_usage_events</li>
+          <li>conversions</li>
+          <li>subscription_events</li>
+          <li>marketing_attribution</li>
+          <li>feature_releases</li>
+        </ul>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="layer silver">
+        <h3>Silver</h3>
+        <div class="role">conformed entities</div>
+        <ul>
+          <li>silver_user_dim</li>
+          <li>silver_subscription_periods</li>
+          <li>silver_feature_states (SCD2)</li>
+          <li>silver_feature_usage_facts</li>
+        </ul>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="layer gold">
+        <h3>Gold</h3>
+        <div class="role">business marts</div>
+        <ul>
+          <li>gold_mrr_waterfall</li>
+          <li>gold_channel_performance</li>
+          <li>gold_feature_conversion_impact</li>
+          <li>gold_weekly_engagement</li>
+        </ul>
+      </div>
+    </div>
+    <p class="section-note flow-caption">
+      Downstream, a DuckDB engine resolves each table's <em>current</em> Delta snapshot via delta-rs and
+      serves the semantic layer, the CLI, and the chatbot — interactive SQL without a Spark cluster.
+    </p>
+  </section>
+
+  <section>
+    <div class="eyebrow">the flagship mart</div>
+    <h2>MRR waterfall — consistent by construction</h2>
+    <p class="section-note">
+      Subscription lifecycle events (started, expanded, contracted, upgraded, cancelled) carry MRR before
+      and after each change, so revenue movements are simple deltas. Starting and ending MRR are a running
+      total of those movements, which makes <code>ending = starting + net_new</code> hold for every month
+      — an identity the test suite asserts.
+    </p>
+
+    <div class="chart-card">
+      <h3>Monthly MRR movements, 2024</h3>
+      <div class="sub">Gains above the line, losses below · synthetic data with engineered signals</div>
+      <div class="legend" id="wf-legend"></div>
+      <div class="chart-wrap" id="wf-wrap">
+        <svg id="wf-chart" viewBox="0 0 920 320" role="img" aria-label="Stacked monthly bar chart of MRR gains (new business, expansion) and losses (contraction, churn) for each month of 2024"></svg>
+        <div class="tooltip" id="wf-tip"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Ending MRR</h3>
+      <div class="sub">Cumulative result of the movements above · $0 → $2.27M</div>
+      <div class="chart-wrap" id="line-wrap">
+        <svg id="line-chart" viewBox="0 0 920 190" role="img" aria-label="Line chart of ending MRR growing from zero to 2.27 million dollars across 2024"></svg>
+        <div class="tooltip" id="line-tip"></div>
+      </div>
+      <details class="table-view">
+        <summary>View the numbers as a table</summary>
+        <div style="overflow-x:auto"><table id="wf-table"></table></div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">engineered signals</div>
+    <h2>Synthetic data with ground truth to find</h2>
+    <p class="section-note">
+      The generator plants causal structure so every downstream analysis has a known right answer:
+      referral and content bring high-intent users, feature adoption boosts conversion
+      (<span style="font-variant-numeric: tabular-nums">40%</span> with real-time collab vs
+      <span style="font-variant-numeric: tabular-nums">21%</span> without) and lowers churn.
+      The channel ranking below is the pipeline's output matching the engineered truth.
+    </p>
+    <div class="chart-card">
+      <h3>Conversion rate by acquisition channel</h3>
+      <div class="sub">gold_channel_performance · share of 2024 signups that became paying customers</div>
+      <div class="chart-wrap" id="ch-wrap">
+        <svg id="ch-chart" viewBox="0 0 920 300" role="img" aria-label="Horizontal bar chart of conversion rate by acquisition channel, from referral at 41 percent down to outbound at 22 percent"></svg>
+        <div class="tooltip" id="ch-tip"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">governance</div>
+    <h2>One contract per table drives everything</h2>
+    <p class="section-note">
+      Each table has a YAML contract — description, grain, owner, typed columns, upstreams.
+      Docs are generated from it, the chatbot is grounded in it, and CI fails if reality drifts from it.
+    </p>
+    <div class="loop">
+      <div class="node">
+        <span class="tag">contracts/*.yml</span>
+        <h4>Data contracts</h4>
+        <p>The single source of truth for what every table means.</p>
+      </div>
+      <div class="node">
+        <span class="tag">make docs</span>
+        <h4>Dictionary &amp; lineage</h4>
+        <p>Column-level docs and an OpenLineage-style graph, generated — never hand-edited.</p>
+      </div>
+      <div class="node">
+        <span class="tag">tests/semantic/</span>
+        <h4>Contract tests</h4>
+        <p>Contract == Spark <code>StructType</code> == Airflow Dataset wiring, asserted in CI.</p>
+      </div>
+      <div class="node">
+        <span class="tag">semantic/metrics.yml</span>
+        <h4>Governed metrics</h4>
+        <p>Metrics as SQL aggregates — ratios of sums, so any regrouping stays correct.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">ai analytics</div>
+    <h2>Ask the lakehouse a question</h2>
+    <p class="section-note">
+      The chatbot (Claude + tool use) has exactly two tools: governed metric queries and guarded read-only
+      SQL. Every query it runs is shown next to the answer — auditable, not a black box.
+    </p>
+    <div class="chat">
+      <div class="q">Which acquisition channel brings the best customers?</div>
+      <div class="a">
+        <div class="toolcall">query_metric&nbsp;{ metrics: [conversion_rate, signups, acquired_mrr], dimensions: [acquisition_channel] }</div>
+        <p><strong>Referral</strong> is the strongest channel: a <span class="num">41.3%</span> conversion rate
+          (<span class="num">210</span> of <span class="num">509</span> signups) and
+          <span class="num">$333K</span> in acquired MRR — nearly double the conversion rate of paid social
+          (<span class="num">21.9%</span>) and outbound (<span class="num">21.8%</span>).</p>
+        <p>Content marketing (<span class="num">35.9%</span>) and organic search (<span class="num">34.0%</span>)
+          follow; organic is the largest volume source with <span class="num">1,192</span> signups.
+          Source: <em>gold_channel_performance</em>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">engineering practice</div>
+    <h2>Built like production software</h2>
+    <div class="grid2">
+      <div class="practice"><h4>CI on every push</h4><p>GitHub Actions: ruff, black, mypy, and the full Spark + Airflow + semantic test suite with Java and uv caching.</p></div>
+      <div class="practice"><h4>Tests mirror the source tree</h4><p><code>tests/spark/jobs/silver/test_user_dim.py</code> tests <code>spark/jobs/silver/user_dim/</code> — finding a test is mechanical.</p></div>
+      <div class="practice"><h4>Quality gates in the DAGs</h4><p>Every table runs <code>assert_input_quality → process → assert_output_quality</code>; schema and row-count checks fail loudly.</p></div>
+      <div class="practice"><h4>Data-aware scheduling</h4><p>Silver and gold DAGs are triggered by Airflow Datasets — by upstream data landing, not by the clock.</p></div>
+      <div class="practice"><h4>Decisions written down</h4><p>Seven ADRs cover every major choice, from medallion-on-Delta to the chatbot's safety posture.</p></div>
+      <div class="practice"><h4>Reproducible by one command</h4><p>Seeded generator + idempotent pipeline: <code>make generate-data &amp;&amp; make pipeline</code> rebuilds the lakehouse.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">try it</div>
+    <h2>Quickstart</h2>
+    <pre class="term"><span class="c"># build the lakehouse</span>
+<span class="p">$</span> make setup &amp;&amp; make generate-data &amp;&amp; make pipeline
+
+<span class="c"># query governed metrics from the terminal</span>
+<span class="p">$</span> uv run python -m semantic.cli query conversion_rate -d acquisition_channel
+
+<span class="c"># chat with the data (needs ANTHROPIC_API_KEY)</span>
+<span class="p">$</span> make chatbot</pre>
+  </section>
+
+  <footer class="ga-footer">
+    <span>Growth Analytics Platform</span>
+    <a href="https://github.com/uncoated-engineering/growth-analytics-pipeline">github.com/uncoated-engineering/growth-analytics-pipeline</a>
+    <span>Spark · Delta Lake · Airflow · DuckDB · Claude</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  // gold_mrr_waterfall, 2024 (USD)
+  var WF = [
+    { nb: 42638, ex: 0, co: 0, ch: 0, end: 42638 },
+    { nb: 176407, ex: 1687, co: 0, ch: 59, end: 220673 },
+    { nb: 209023, ex: 5211, co: 7227, ch: 8060, end: 419620 },
+    { nb: 218737, ex: 12105, co: 6694, ch: 5265, end: 638503 },
+    { nb: 288601, ex: 14722, co: 1833, ch: 7475, end: 932518 },
+    { nb: 260660, ex: 34573, co: 10393, ch: 15459, end: 1201899 },
+    { nb: 331696, ex: 41599, co: 12610, ch: 5896, end: 1556688 },
+    { nb: 294158, ex: 45110, co: 20995, ch: 35472, end: 1839489 },
+    { nb: 284920, ex: 57094, co: 17766, ch: 15135, end: 2148602 },
+    { nb: 96539, ex: 52493, co: 10357, ch: 38890, end: 2248387 },
+    { nb: 4284, ex: 70395, co: 13839, ch: 64809, end: 2244418 },
+    { nb: 0, ex: 79251, co: 24507, ch: 28650, end: 2270512 }
+  ];
+  var CHANNELS = [
+    { name: "referral", rate: 41.3 },
+    { name: "content_marketing", rate: 35.9 },
+    { name: "organic_search", rate: 34.0 },
+    { name: "unattributed", rate: 33.6 },
+    { name: "partner", rate: 29.0 },
+    { name: "paid_search", rate: 27.6 },
+    { name: "paid_social", rate: 21.9 },
+    { name: "outbound", rate: 21.8 }
+  ];
+
+  var css = getComputedStyle(document.documentElement);
+  function tok(name) { return css.getPropertyValue(name).trim(); }
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  function el(name, attrs, parent) {
+    var node = document.createElementNS(SVGNS, name);
+    for (var k in attrs) node.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(node);
+    return node;
+  }
+  function fmtK(v) {
+    if (v >= 1000000) return "$" + (v / 1000000).toFixed(2) + "M";
+    if (v >= 1000) return "$" + Math.round(v / 1000) + "K";
+    return "$" + v;
+  }
+  function moveTip(tip, wrap, x, y, html) {
+    tip.innerHTML = html;
+    tip.style.opacity = "1";
+    var wrapBox = wrap.getBoundingClientRect();
+    var tipBox = tip.getBoundingClientRect();
+    var left = Math.min(Math.max(x - tipBox.width / 2, 4), wrapBox.width - tipBox.width - 4);
+    tip.style.left = left + "px";
+    tip.style.top = Math.max(y - tipBox.height - 12, 0) + "px";
+  }
+
+  // ── Waterfall movements ──────────────────────────────────────────────────
+  function drawWaterfall() {
+    var svg = document.getElementById("wf-chart");
+    svg.textContent = "";
+    var W = 920, H = 320, mL = 56, mR = 12, mT = 12, mB = 26;
+    var plotW = W - mL - mR, plotH = H - mT - mB;
+    var maxUp = 0, maxDown = 0;
+    WF.forEach(function (d) {
+      maxUp = Math.max(maxUp, d.nb + d.ex);
+      maxDown = Math.max(maxDown, d.co + d.ch);
+    });
+    var span = maxUp + maxDown;
+    var zeroY = mT + (maxUp / span) * plotH;
+    function sy(v) { return (v / span) * plotH; }
+
+    // gridlines at 100k steps up
+    for (var g = 100000; g <= maxUp; g += 100000) {
+      var gy = zeroY - sy(g);
+      el("line", { x1: mL, x2: W - mR, y1: gy, y2: gy, stroke: tok("--grid"), "stroke-width": 1 }, svg);
+      var lbl = el("text", { x: mL - 8, y: gy + 4, "text-anchor": "end", "class": "axis-label" }, svg);
+      lbl.textContent = "$" + g / 1000 + "K";
+    }
+    var band = plotW / 12, barW = Math.min(40, band - 14);
+
+    var series = [
+      { key: "nb", label: "New business", color: tok("--gain-1"), dir: 1 },
+      { key: "ex", label: "Expansion", color: tok("--gain-2"), dir: 1 },
+      { key: "co", label: "Contraction", color: tok("--loss-2"), dir: -1 },
+      { key: "ch", label: "Churn", color: tok("--loss-1"), dir: -1 }
+    ];
+
+    WF.forEach(function (d, i) {
+      var cx = mL + band * i + band / 2;
+      var upBase = zeroY, downBase = zeroY;
+      series.forEach(function (s) {
+        var v = d[s.key];
+        if (v <= 0) return;
+        var h = Math.max(sy(v), 1.5);
+        var y;
+        if (s.dir === 1) { y = upBase - h; upBase = y - 2; }       /* 2px surface gap */
+        else { y = downBase + 2; downBase = y + h; y = downBase - h; }
+        el("rect", {
+          x: cx - barW / 2, y: y, width: barW, height: h,
+          fill: s.color, rx: 2
+        }, svg);
+      });
+      var tick = el("text", { x: cx, y: H - 8, "text-anchor": "middle", "class": "axis-label" }, svg);
+      tick.textContent = MONTHS[i];
+    });
+    // baseline on top of bars' gap
+    el("line", { x1: mL, x2: W - mR, y1: zeroY, y2: zeroY, stroke: tok("--baseline"), "stroke-width": 1.5 }, svg);
+
+    // hover: one target per month column
+    var wrap = document.getElementById("wf-wrap");
+    var tip = document.getElementById("wf-tip");
+    WF.forEach(function (d, i) {
+      var cx = mL + band * i + band / 2;
+      var hit = el("rect", { x: mL + band * i, y: mT, width: band, height: plotH, fill: "transparent" }, svg);
+      hit.addEventListener("mousemove", function (evt) {
+        var box = wrap.getBoundingClientRect();
+        moveTip(tip, wrap, evt.clientX - box.left, evt.clientY - box.top,
+          "<strong>" + MONTHS[i] + " 2024</strong><br>" +
+          "new business " + fmtK(d.nb) + "<br>" +
+          "expansion +" + fmtK(d.ex).slice(1) + "<br>" +
+          "contraction −" + fmtK(d.co).slice(1) + "<br>" +
+          "churn −" + fmtK(d.ch).slice(1) + "<br>" +
+          "ending " + fmtK(d.end));
+      });
+      hit.addEventListener("mouseleave", function () { tip.style.opacity = "0"; });
+    });
+
+    // legend
+    var legend = document.getElementById("wf-legend");
+    legend.textContent = "";
+    series.forEach(function (s) {
+      var item = document.createElement("span");
+      var chip = document.createElement("i");
+      chip.style.background = s.color;
+      item.appendChild(chip);
+      item.appendChild(document.createTextNode(s.label));
+      legend.appendChild(item);
+    });
+  }
+
+  // ── Ending MRR line ──────────────────────────────────────────────────────
+  function drawLine() {
+    var svg = document.getElementById("line-chart");
+    svg.textContent = "";
+    var W = 920, H = 190, mL = 56, mR = 70, mT = 14, mB = 26;
+    var plotW = W - mL - mR, plotH = H - mT - mB;
+    var maxV = 2400000;
+    function x(i) { return mL + (plotW / 11) * i; }
+    function y(v) { return mT + plotH - (v / maxV) * plotH; }
+
+    [1000000, 2000000].forEach(function (g) {
+      el("line", { x1: mL, x2: W - mR, y1: y(g), y2: y(g), stroke: tok("--grid"), "stroke-width": 1 }, svg);
+      var lbl = el("text", { x: mL - 8, y: y(g) + 4, "text-anchor": "end", "class": "axis-label" }, svg);
+      lbl.textContent = "$" + g / 1000000 + "M";
+    });
+    el("line", { x1: mL, x2: W - mR, y1: y(0), y2: y(0), stroke: tok("--baseline"), "stroke-width": 1.5 }, svg);
+
+    var pts = WF.map(function (d, i) { return [x(i), y(d.end)]; });
+    var path = "M" + pts.map(function (p) { return p[0] + "," + p[1]; }).join(" L");
+    // area fill
+    el("path", {
+      d: path + " L" + pts[11][0] + "," + y(0) + " L" + pts[0][0] + "," + y(0) + " Z",
+      fill: tok("--gain-2"), opacity: 0.18
+    }, svg);
+    el("path", { d: path, fill: "none", stroke: tok("--gain-1"), "stroke-width": 2 }, svg);
+    // emphasized endpoint + direct label
+    el("circle", { cx: pts[11][0], cy: pts[11][1], r: 4, fill: tok("--gain-1"), stroke: tok("--surface"), "stroke-width": 2 }, svg);
+    var endLbl = el("text", {
+      x: pts[11][0] + 10, y: pts[11][1] + 4, "class": "axis-label",
+      "font-weight": "700"
+    }, svg);
+    endLbl.setAttribute("fill", tok("--ink"));
+    endLbl.textContent = "$2.27M";
+    [0, 3, 6, 9, 11].forEach(function (i) {
+      var t = el("text", { x: x(i), y: H - 8, "text-anchor": "middle", "class": "axis-label" }, svg);
+      t.textContent = MONTHS[i];
+    });
+
+    var wrap = document.getElementById("line-wrap");
+    var tip = document.getElementById("line-tip");
+    var cross = el("line", { x1: 0, x2: 0, y1: mT, y2: mT + plotH, stroke: tok("--baseline"), "stroke-width": 1, opacity: 0 }, svg);
+    var hit = el("rect", { x: mL, y: mT, width: plotW, height: plotH, fill: "transparent" }, svg);
+    hit.addEventListener("mousemove", function (evt) {
+      var box = wrap.getBoundingClientRect();
+      var svgBox = svg.getBoundingClientRect();
+      var scale = 920 / svgBox.width;
+      var mx = (evt.clientX - svgBox.left) * scale;
+      var i = Math.max(0, Math.min(11, Math.round((mx - mL) / (plotW / 11))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i));
+      cross.setAttribute("opacity", "1");
+      moveTip(tip, wrap, x(i) / scale, y(WF[i].end) / scale,
+        "<strong>" + MONTHS[i] + "</strong> ending " + fmtK(WF[i].end));
+    });
+    hit.addEventListener("mouseleave", function () { tip.style.opacity = "0"; cross.setAttribute("opacity", "0"); });
+  }
+
+  // ── Channel bars ─────────────────────────────────────────────────────────
+  function drawChannels() {
+    var svg = document.getElementById("ch-chart");
+    svg.textContent = "";
+    var W = 920, H = 300, mL = 170, mR = 70, mT = 8, mB = 8;
+    var plotW = W - mL - mR;
+    var rowH = (H - mT - mB) / CHANNELS.length;
+    var maxV = 45;
+    var wrap = document.getElementById("ch-wrap");
+    var tip = document.getElementById("ch-tip");
+
+    CHANNELS.forEach(function (c, i) {
+      var yMid = mT + rowH * i + rowH / 2;
+      var w = (c.rate / maxV) * plotW;
+      var name = el("text", { x: mL - 12, y: yMid + 4, "text-anchor": "end", "class": "axis-label" }, svg);
+      name.textContent = c.name;
+      var bar = el("rect", {
+        x: mL, y: yMid - 9, width: w, height: 18, rx: 3,
+        fill: tok("--gain-1"), opacity: i === 0 ? 1 : 0.75
+      }, svg);
+      var val = el("text", { x: mL + w + 10, y: yMid + 4, "class": "axis-label", "font-weight": i === 0 ? "700" : "400" }, svg);
+      val.setAttribute("fill", i === 0 ? tok("--ink") : tok("--muted"));
+      val.textContent = c.rate.toFixed(1) + "%";
+      bar.addEventListener("mousemove", function (evt) {
+        var box = wrap.getBoundingClientRect();
+        moveTip(tip, wrap, evt.clientX - box.left, evt.clientY - box.top,
+          "<strong>" + c.name + "</strong> " + c.rate.toFixed(1) + "% conversion");
+      });
+      bar.addEventListener("mouseleave", function () { tip.style.opacity = "0"; });
+    });
+    el("line", { x1: mL, x2: mL, y1: mT, y2: H - mB, stroke: tok("--baseline"), "stroke-width": 1.5 }, svg);
+  }
+
+  // ── Table view ───────────────────────────────────────────────────────────
+  function buildTable() {
+    var table = document.getElementById("wf-table");
+    var head = "<tr><th>month</th><th>new business</th><th>expansion</th><th>contraction</th><th>churn</th><th>ending MRR</th></tr>";
+    var rows = WF.map(function (d, i) {
+      return "<tr><td>" + MONTHS[i] + "</td><td>" + d.nb.toLocaleString("en-US") + "</td><td>" +
+        d.ex.toLocaleString("en-US") + "</td><td>" + d.co.toLocaleString("en-US") + "</td><td>" +
+        d.ch.toLocaleString("en-US") + "</td><td>" + d.end.toLocaleString("en-US") + "</td></tr>";
+    }).join("");
+    table.innerHTML = head + rows;
+  }
+
+  function drawAll() {
+    css = getComputedStyle(document.documentElement);
+    drawWaterfall();
+    drawLine();
+    drawChannels();
+  }
+  drawAll();
+  buildTable();
+
+  // redraw when the theme flips (media query or data-theme stamp)
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", drawAll);
+  new MutationObserver(drawAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+
+</body>
+</html>
