@@ -8,7 +8,6 @@ Tests cover:
 - Edge cases: no conversions, no feature usage, single feature
 """
 
-
 from pyspark.sql.functions import col
 
 from spark.jobs.gold.feature_conversion_impact.aggregation import (

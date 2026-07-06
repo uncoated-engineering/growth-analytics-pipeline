@@ -9,9 +9,10 @@ import os
 
 from spark.jobs.silver.main import run_silver_transformation
 from tests.spark.helpers import (
-    setup_bronze_conversions,
     setup_bronze_feature_releases,
     setup_bronze_feature_usage_events,
+    setup_bronze_marketing_attribution,
+    setup_bronze_subscription_events,
     setup_bronze_user_signups,
 )
 
@@ -40,19 +41,6 @@ class TestRunSilverTransformation:
         ]
         setup_bronze_user_signups(spark, temp_dir, signups, bronze_path)
 
-        conversions = [
-            {
-                "user_id": 1,
-                "conversion_date": "2024-02-01",
-                "plan": "Pro",
-                "mrr": 99,
-                "signup_date": "2024-01-15",
-                "days_to_convert": 17,
-                "used_real_time_collab": True,
-            },
-        ]
-        setup_bronze_conversions(spark, temp_dir, conversions, bronze_path)
-
         events = [
             {
                 "timestamp": "2024-01-15 10:30:00",
@@ -64,6 +52,30 @@ class TestRunSilverTransformation:
         ]
         setup_bronze_feature_usage_events(spark, temp_dir, events, bronze_path)
 
+        attribution = [
+            {
+                "user_id": 1,
+                "channel": "paid_search",
+                "campaign": "brand_q1",
+                "first_touch_date": "2024-01-15",
+            },
+        ]
+        setup_bronze_marketing_attribution(spark, temp_dir, attribution, bronze_path)
+
+        subscription_events = [
+            {
+                "event_id": 1,
+                "user_id": 1,
+                "event_date": "2024-02-01",
+                "event_type": "subscription_started",
+                "plan": "pro",
+                "mrr": 99,
+                "previous_plan": None,
+                "previous_mrr": None,
+            },
+        ]
+        setup_bronze_subscription_events(spark, temp_dir, subscription_events, bronze_path)
+
         silver_path = os.path.join(temp_dir, "silver")
 
         # Run full transformation
@@ -73,12 +85,14 @@ class TestRunSilverTransformation:
         assert stats["feature_states"] == 1
         assert stats["user_dim"] == 1
         assert stats["feature_usage_facts"] == 1
+        assert stats["subscription_periods"] == 1
 
         # Verify all silver tables exist
         for table_name in [
             "silver_feature_states",
             "silver_user_dim",
             "silver_feature_usage_facts",
+            "silver_subscription_periods",
         ]:
             table_path = os.path.join(silver_path, table_name)
             assert os.path.exists(table_path), f"Table {table_name} should exist"
@@ -120,19 +134,6 @@ class TestRunSilverTransformation:
         ]
         setup_bronze_user_signups(spark, temp_dir, signups, bronze_path)
 
-        conversions = [
-            {
-                "user_id": 1,
-                "conversion_date": "2024-02-01",
-                "plan": "Pro",
-                "mrr": 99,
-                "signup_date": "2024-01-01",
-                "days_to_convert": 31,
-                "used_real_time_collab": True,
-            },
-        ]
-        setup_bronze_conversions(spark, temp_dir, conversions, bronze_path)
-
         events = [
             {
                 "timestamp": "2024-01-15 10:30:00",
@@ -151,6 +152,41 @@ class TestRunSilverTransformation:
         ]
         setup_bronze_feature_usage_events(spark, temp_dir, events, bronze_path)
 
+        attribution = [
+            {
+                "user_id": 1,
+                "channel": "organic",
+                "campaign": "none",
+                "first_touch_date": "2024-01-01",
+            },
+        ]
+        setup_bronze_marketing_attribution(spark, temp_dir, attribution, bronze_path)
+
+        # started + expanded -> 2 subscription periods
+        subscription_events = [
+            {
+                "event_id": 1,
+                "user_id": 1,
+                "event_date": "2024-02-01",
+                "event_type": "subscription_started",
+                "plan": "pro",
+                "mrr": 99,
+                "previous_plan": None,
+                "previous_mrr": None,
+            },
+            {
+                "event_id": 2,
+                "user_id": 1,
+                "event_date": "2024-03-01",
+                "event_type": "seats_expanded",
+                "plan": "pro",
+                "mrr": 150,
+                "previous_plan": "pro",
+                "previous_mrr": 99,
+            },
+        ]
+        setup_bronze_subscription_events(spark, temp_dir, subscription_events, bronze_path)
+
         silver_path = os.path.join(temp_dir, "silver")
         stats = run_silver_transformation(spark, bronze_path, silver_path)
 
@@ -158,3 +194,4 @@ class TestRunSilverTransformation:
         assert stats["feature_states"] == 2
         assert stats["user_dim"] == 3
         assert stats["feature_usage_facts"] == 2
+        assert stats["subscription_periods"] == 2

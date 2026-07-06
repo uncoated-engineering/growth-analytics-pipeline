@@ -24,8 +24,8 @@ def spark():
             "spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog"
         )
         .config("spark.sql.warehouse.dir", tempfile.mkdtemp())
-        .config("spark.driver.memory", "1g")
-        .config("spark.executor.memory", "1g")
+        .config("spark.driver.memory", "2g")
+        .config("spark.executor.memory", "2g")
         .config("spark.ui.enabled", "false")  # Disable UI for tests
         .config("spark.driver.bindAddress", "127.0.0.1")
         .config("spark.driver.host", "127.0.0.1")  # Force driver to use localhost

@@ -70,6 +70,34 @@ class TestRunBronzeIngestion:
             for record in conversions:
                 f.write(json.dumps(record) + "\n")
 
+        marketing_attribution = [
+            {
+                "user_id": 1,
+                "channel": "paid_search",
+                "campaign": "brand_q1",
+                "first_touch_date": "2024-01-10",
+            },
+        ]
+        with open(os.path.join(raw_data_path, "marketing_attribution.jsonl"), "w") as f:
+            for record in marketing_attribution:
+                f.write(json.dumps(record) + "\n")
+
+        subscription_events = [
+            {
+                "event_id": 1,
+                "user_id": 1,
+                "event_date": "2024-01-20",
+                "event_type": "subscription_started",
+                "plan": "pro",
+                "mrr": 99,
+                "previous_plan": None,
+                "previous_mrr": None,
+            },
+        ]
+        with open(os.path.join(raw_data_path, "subscription_events.jsonl"), "w") as f:
+            for record in subscription_events:
+                f.write(json.dumps(record) + "\n")
+
         # Run bronze ingestion
         stats = run_bronze_ingestion(spark, raw_data_path, bronze_path)
 
@@ -78,6 +106,8 @@ class TestRunBronzeIngestion:
         assert stats["user_signups"] == 1
         assert stats["feature_usage_events"] == 1
         assert stats["conversions"] == 1
+        assert stats["marketing_attribution"] == 1
+        assert stats["subscription_events"] == 1
 
         # Verify all Delta tables exist and have data
         for table_name in [
@@ -85,6 +115,8 @@ class TestRunBronzeIngestion:
             "user_signups",
             "feature_usage_events",
             "conversions",
+            "marketing_attribution",
+            "subscription_events",
         ]:
             table_path = os.path.join(bronze_path, table_name)
             assert os.path.exists(table_path), f"Table {table_name} should exist"
@@ -106,6 +138,10 @@ class TestRunBronzeIngestion:
             pass
         with open(os.path.join(raw_data_path, "conversions.jsonl"), "w") as f:
             pass
+        with open(os.path.join(raw_data_path, "marketing_attribution.jsonl"), "w") as f:
+            pass
+        with open(os.path.join(raw_data_path, "subscription_events.jsonl"), "w") as f:
+            pass
 
         stats = run_bronze_ingestion(spark, raw_data_path, bronze_path)
 
@@ -115,3 +151,5 @@ class TestRunBronzeIngestion:
         assert "user_signups" in stats
         assert "feature_usage_events" in stats
         assert "conversions" in stats
+        assert "marketing_attribution" in stats
+        assert "subscription_events" in stats
